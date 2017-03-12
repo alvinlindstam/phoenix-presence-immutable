@@ -13,10 +13,10 @@
   </body>
   <script type="text/javascript">
     window.onload = () => {
-      if (typeof(Module) !== 'undefined') {
-        document.querySelector('#app').innerHTML = '<h3>Module has loaded! Open the console to use the module available globally window.Module</h3>'
+      if (typeof(Presence) !== 'undefined') {
+        document.querySelector('#app').innerHTML = '<h3>Presence has loaded! Open the console to use the object available globally window.Presence</h3>'
       } else {
-        document.querySelector('#app').innerHTML = '<h2 style="color:red;">Module failed to load</h2>'
+        document.querySelector('#app').innerHTML = '<h2 style="color:red;">Presence failed to load</h2>'
       }
     }
   </script>

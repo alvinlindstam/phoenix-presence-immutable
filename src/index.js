@@ -167,6 +167,8 @@
 //     })
 //
 
+import Immutable from 'immutable'
+
 export var Presence = {
 
   syncState (currentState, newState, onJoin, onLeave) {
@@ -202,29 +204,40 @@ export var Presence = {
   },
 
   syncDiff (currentState, {joins, leaves}, onJoin, onLeave) {
-    let state = this.clone(currentState)
+    let state = currentState
     if (!onJoin) { onJoin = function () {} }
     if (!onLeave) { onLeave = function () {} }
 
-    this.map(joins, (key, newPresence) => {
-      let currentPresence = state[key]
-      state[key] = newPresence
+    state = this.reduce(state, joins, (state, key, newPresence) => {
+      const currentPresence = state.get(key)
+      newPresence = Immutable.fromJS(newPresence)
+
       if (currentPresence) {
-        state[key].metas.unshift(...currentPresence.metas)
+        const newMetas = currentPresence.get('metas').concat(newPresence.get('metas'))
+        newPresence = newPresence.set('metas', newMetas)
       }
+      state = state.set(key, newPresence)
+      // todo: should callbacks be allowed to mutate the state?
       onJoin(key, currentPresence, newPresence)
+      return state
     })
-    this.map(leaves, (key, leftPresence) => {
-      let currentPresence = state[key]
-      if (!currentPresence) { return }
-      let refsToRemove = leftPresence.metas.map(m => m.phx_ref)
-      currentPresence.metas = currentPresence.metas.filter(p => {
-        return refsToRemove.indexOf(p.phx_ref) < 0
+    state = this.reduce(state, leaves, (state, key, leftPresence) => {
+      const currentPresence = state.get(key)
+      if (!currentPresence) { return state }
+      const refsToRemove = leftPresence.metas.map(m => m.phx_ref)
+
+      leftPresence = Immutable.fromJS(leftPresence)
+      const currentMetas = currentPresence.get('metas').filter(p => {
+        return refsToRemove.indexOf(p.get('phx_ref')) < 0
       })
-      onLeave(key, currentPresence, leftPresence)
-      if (currentPresence.metas.length === 0) {
-        delete state[key]
+      if (currentMetas.size === 0) {
+        state = state.delete(key)
+      } else {
+        state = state.set(key, currentPresence.set('metas', currentMetas))
       }
+      // todo: should callbacks be allowed to mutate the state?
+      onLeave(key, currentPresence, leftPresence)
+      return state
     })
     return state
   },
@@ -241,6 +254,11 @@ export var Presence = {
 
   map (obj, func) {
     return Object.getOwnPropertyNames(obj).map(key => func(key, obj[key]))
+  },
+
+  reduce (state, obj, func) {
+    const keys = Object.getOwnPropertyNames(obj)
+    return keys.reduce((state, key) => func(state, key, obj[key]), state)
   },
 
   clone (obj) { return JSON.parse(JSON.stringify(obj)) }

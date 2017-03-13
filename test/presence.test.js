@@ -1,6 +1,7 @@
 import assert from 'assert'
 
-import {Presence} from '../dist/bundle.js'
+import {Presence} from '../src/index.js'
+import {Map, fromJS} from 'immutable'
 
 let clone = (obj) => { return JSON.parse(JSON.stringify(obj)) }
 
@@ -17,6 +18,9 @@ let fixtures = {
       u2: {metas: [{id: 2, phx_ref: '2'}]},
       u3: {metas: [{id: 3, phx_ref: '3'}]}
     }
+  },
+  immutableState () {
+    return fromJS(this.state())
   }
 }
 
@@ -81,38 +85,51 @@ describe('syncState', () => {
 })
 
 describe('syncDiff', () => {
+  it('does nothing without leaves or joins', () => {
+    const state = new Map()
+    const newState = Presence.syncDiff(state, {joins: {}, leaves: {}})
+    assert.deepEqual(newState, state)
+  })
+
   it('syncs empty state', () => {
     let joins = {u1: {metas: [{id: 1, phx_ref: '1'}]}}
-    let state = {}
-    Presence.syncDiff(state, {joins: joins, leaves: {}})
-    assert.deepEqual(state, {})
+    const state = new Map({})
+    const newState = Presence.syncDiff(state, {joins: joins, leaves: {}})
+    assert.deepEqual(joins, newState.toJS())
+  })
 
-    state = Presence.syncDiff(state, {
-      joins: joins,
-      leaves: {}
-    })
-    assert.deepEqual(state, joins)
+  it('adds additional meta', () => {
+    let state = fixtures.immutableState()
+    const newState = Presence.syncDiff(state, {joins: fixtures.joins(), leaves: {}})
+
+    assert.deepEqual({
+      u1: {metas: [{id: 1, phx_ref: '1'}, {id: 1, phx_ref: '1.2'}]},
+      u2: {metas: [{id: 2, phx_ref: '2'}]},
+      u3: {metas: [{id: 3, phx_ref: '3'}]}
+    }, newState.toJS())
   })
 
   it('removes presence when meta is empty and adds additional meta', () => {
-    let state = fixtures.state()
-    state = Presence.syncDiff(state, {joins: fixtures.joins(), leaves: fixtures.leaves()})
+    let state = fixtures.immutableState()
+    const newState = Presence.syncDiff(state, {joins: fixtures.joins(), leaves: fixtures.leaves()})
 
-    assert.deepEqual(state, {
+    assert.deepEqual({
       u1: {metas: [{id: 1, phx_ref: '1'}, {id: 1, phx_ref: '1.2'}]},
       u3: {metas: [{id: 3, phx_ref: '3'}]}
-    })
+    },
+    newState.toJS())
   })
 
   it('removes meta while leaving key if other metas exist', () => {
-    let state = {
+    const state = fromJS({
       u1: {metas: [{id: 1, phx_ref: '1'}, {id: 1, phx_ref: '1.2'}]}
-    }
-    state = Presence.syncDiff(state, {joins: {}, leaves: {u1: {metas: [{id: 1, phx_ref: '1'}]}}})
-
-    assert.deepEqual(state, {
-      u1: {metas: [{id: 1, phx_ref: '1.2'}]}
     })
+    console.warn("wip")
+    const newState = Presence.syncDiff(state, {joins: {}, leaves: {u1: {metas: [{id: 1, phx_ref: '1'}]}}})
+
+    assert.deepEqual({
+      u1: {metas: [{id: 1, phx_ref: '1.2'}]}
+    }, newState.toJS())
   })
 })
 

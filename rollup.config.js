@@ -8,6 +8,7 @@ export default {
   entry: 'src/index.js',
   dest: 'dist/bundle.js',
   format: 'cjs', // iife, cjs, umd
+  external: ['immutable'],
   plugins: [
     // get node_module packages for the bundle
     resolve({

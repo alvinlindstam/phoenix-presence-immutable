@@ -2,128 +2,9 @@
 
 Object.defineProperty(exports, '__esModule', { value: true });
 
-var asyncGenerator = function () {
-  function AwaitValue(value) {
-    this.value = value;
-  }
+function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
-  function AsyncGenerator(gen) {
-    var front, back;
-
-    function send(key, arg) {
-      return new Promise(function (resolve, reject) {
-        var request = {
-          key: key,
-          arg: arg,
-          resolve: resolve,
-          reject: reject,
-          next: null
-        };
-
-        if (back) {
-          back = back.next = request;
-        } else {
-          front = back = request;
-          resume(key, arg);
-        }
-      });
-    }
-
-    function resume(key, arg) {
-      try {
-        var result = gen[key](arg);
-        var value = result.value;
-
-        if (value instanceof AwaitValue) {
-          Promise.resolve(value.value).then(function (arg) {
-            resume("next", arg);
-          }, function (arg) {
-            resume("throw", arg);
-          });
-        } else {
-          settle(result.done ? "return" : "normal", result.value);
-        }
-      } catch (err) {
-        settle("throw", err);
-      }
-    }
-
-    function settle(type, value) {
-      switch (type) {
-        case "return":
-          front.resolve({
-            value: value,
-            done: true
-          });
-          break;
-
-        case "throw":
-          front.reject(value);
-          break;
-
-        default:
-          front.resolve({
-            value: value,
-            done: false
-          });
-          break;
-      }
-
-      front = front.next;
-
-      if (front) {
-        resume(front.key, front.arg);
-      } else {
-        back = null;
-      }
-    }
-
-    this._invoke = send;
-
-    if (typeof gen.return !== "function") {
-      this.return = undefined;
-    }
-  }
-
-  if (typeof Symbol === "function" && Symbol.asyncIterator) {
-    AsyncGenerator.prototype[Symbol.asyncIterator] = function () {
-      return this;
-    };
-  }
-
-  AsyncGenerator.prototype.next = function (arg) {
-    return this._invoke("next", arg);
-  };
-
-  AsyncGenerator.prototype.throw = function (arg) {
-    return this._invoke("throw", arg);
-  };
-
-  AsyncGenerator.prototype.return = function (arg) {
-    return this._invoke("return", arg);
-  };
-
-  return {
-    wrap: function (fn) {
-      return function () {
-        return new AsyncGenerator(fn.apply(this, arguments));
-      };
-    },
-    await: function (value) {
-      return new AwaitValue(value);
-    }
-  };
-}();
-
-var toConsumableArray = function (arr) {
-  if (Array.isArray(arr)) {
-    for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) arr2[i] = arr[i];
-
-    return arr2;
-  } else {
-    return Array.from(arr);
-  }
-};
+var Immutable = _interopDefault(require('immutable'));
 
 // Phoenix Channels JavaScript client
 //
@@ -340,7 +221,7 @@ var Presence = {
     var joins = _ref.joins,
         leaves = _ref.leaves;
 
-    var state = this.clone(currentState);
+    var state = currentState;
     if (!onJoin) {
       onJoin = function onJoin() {};
     }
@@ -348,31 +229,40 @@ var Presence = {
       onLeave = function onLeave() {};
     }
 
-    this.map(joins, function (key, newPresence) {
-      var currentPresence = state[key];
-      state[key] = newPresence;
-      if (currentPresence) {
-        var _state$key$metas;
+    state = this.reduce(state, joins, function (state, key, newPresence) {
+      var currentPresence = state.get(key);
+      newPresence = Immutable.fromJS(newPresence);
 
-        (_state$key$metas = state[key].metas).unshift.apply(_state$key$metas, toConsumableArray(currentPresence.metas));
+      if (currentPresence) {
+        var newMetas = currentPresence.get('metas').concat(newPresence.get('metas'));
+        newPresence = newPresence.set('metas', newMetas);
       }
+      state = state.set(key, newPresence);
+      // todo: should callbacks be allowed to mutate the state?
       onJoin(key, currentPresence, newPresence);
+      return state;
     });
-    this.map(leaves, function (key, leftPresence) {
-      var currentPresence = state[key];
+    state = this.reduce(state, leaves, function (state, key, leftPresence) {
+      var currentPresence = state.get(key);
       if (!currentPresence) {
-        return;
+        return state;
       }
       var refsToRemove = leftPresence.metas.map(function (m) {
         return m.phx_ref;
       });
-      currentPresence.metas = currentPresence.metas.filter(function (p) {
-        return refsToRemove.indexOf(p.phx_ref) < 0;
+
+      leftPresence = Immutable.fromJS(leftPresence);
+      var currentMetas = currentPresence.get('metas').filter(function (p) {
+        return refsToRemove.indexOf(p.get('phx_ref')) < 0;
       });
-      onLeave(key, currentPresence, leftPresence);
-      if (currentPresence.metas.length === 0) {
-        delete state[key];
+      if (currentMetas.size === 0) {
+        state = state.delete(key);
+      } else {
+        state = state.set(key, currentPresence.set('metas', currentMetas));
       }
+      // todo: should callbacks be allowed to mutate the state?
+      onLeave(key, currentPresence, leftPresence);
+      return state;
     });
     return state;
   },
@@ -395,6 +285,12 @@ var Presence = {
     return Object.getOwnPropertyNames(obj).map(function (key) {
       return func(key, obj[key]);
     });
+  },
+  reduce: function reduce(state, obj, func) {
+    var keys = Object.getOwnPropertyNames(obj);
+    return keys.reduce(function (state, key) {
+      return func(state, key, obj[key]);
+    }, state);
   },
   clone: function clone(obj) {
     return JSON.parse(JSON.stringify(obj));

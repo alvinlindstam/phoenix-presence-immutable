@@ -184,57 +184,48 @@ var reduce = function reduce(state, obj, func) {
 
 var Presence = {
   syncState: function syncState(currentState, newState, onJoin, onLeave) {
-    var _this = this;
-
-    var state = this.clone(currentState);
+    var state = currentState;
+    newState = Immutable.fromJS(newState);
     var joins = {};
-    var leaves = {};
 
-    this.map(state, function (key, presence) {
-      if (!newState[key]) {
-        leaves[key] = presence;
-      }
-    });
-    this.map(newState, function (key, newPresence) {
-      var currentPresence = state[key];
+    var leaves = state.filterNot(function (_presence, key) {
+      return newState.has(key);
+    }).toJS();
+    newState.map(function (newPresence, key) {
+      var currentPresence = state.get(key);
       if (currentPresence) {
-        var newRefs = newPresence.metas.map(function (m) {
-          return m.phx_ref;
+        var newRefs = newPresence.get('metas').map(function (m) {
+          return m.get('phx_ref');
         });
-        var curRefs = currentPresence.metas.map(function (m) {
-          return m.phx_ref;
+        var curRefs = currentPresence.get('metas').map(function (m) {
+          return m.get('phx_ref');
         });
-        var joinedMetas = newPresence.metas.filter(function (m) {
-          return curRefs.indexOf(m.phx_ref) < 0;
+        var joinedMetas = newPresence.get('metas').filter(function (m) {
+          return curRefs.indexOf(m.get('phx_ref')) < 0;
         });
-        var leftMetas = currentPresence.metas.filter(function (m) {
-          return newRefs.indexOf(m.phx_ref) < 0;
+        var leftMetas = currentPresence.get('metas').filter(function (m) {
+          return newRefs.indexOf(m.get('phx_ref')) < 0;
         });
-        if (joinedMetas.length > 0) {
-          joins[key] = newPresence;
-          joins[key].metas = joinedMetas;
+
+        if (joinedMetas.size > 0) {
+          joins[key] = newPresence.toJS();
+          joins[key].metas = joinedMetas.toJS();
         }
-        if (leftMetas.length > 0) {
-          leaves[key] = _this.clone(currentPresence);
-          leaves[key].metas = leftMetas;
+
+        if (leftMetas.size > 0) {
+          leaves[key] = currentPresence.toJS();
+          leaves[key].metas = leftMetas.toJS();
         }
       } else {
-        joins[key] = newPresence;
+        joins[key] = newPresence.toJS();
       }
     });
+
     return this.syncDiff(state, { joins: joins, leaves: leaves }, onJoin, onLeave);
   },
-  syncDiff: function syncDiff(currentState, _ref, onJoin, onLeave) {
+  syncDiff: function syncDiff(state, _ref, onJoin, onLeave) {
     var joins = _ref.joins,
         leaves = _ref.leaves;
-
-    var state = currentState;
-    if (!onJoin) {
-      onJoin = function onJoin() {};
-    }
-    if (!onLeave) {
-      onLeave = function onLeave() {};
-    }
 
     state = reduce(state, joins, function (state, key, newPresence) {
       var currentPresence = state.get(key);
@@ -244,12 +235,12 @@ var Presence = {
         var newMetas = currentPresence.get('metas').concat(newPresence.get('metas'));
         newPresence = newPresence.set('metas', newMetas);
       }
-      state = state.set(key, newPresence);
       // todo: should callbacks be allowed to mutate the state?
-      onJoin(key, currentPresence, newPresence);
-      return state;
+      onJoin && onJoin(key, currentPresence, newPresence);
+      return state.set(key, newPresence);
     });
-    state = reduce(state, leaves, function (state, key, leftPresence) {
+
+    return reduce(state, leaves, function (state, key, leftPresence) {
       var currentPresence = state.get(key);
       if (!currentPresence) {
         return state;
@@ -262,39 +253,19 @@ var Presence = {
       var currentMetas = currentPresence.get('metas').filter(function (p) {
         return refsToRemove.indexOf(p.get('phx_ref')) < 0;
       });
-      if (currentMetas.size === 0) {
-        state = state.delete(key);
-      } else {
-        state = state.set(key, currentPresence.set('metas', currentMetas));
-      }
-      // todo: should callbacks be allowed to mutate the state?
-      onLeave(key, currentPresence, leftPresence);
-      return state;
-    });
-    return state;
-  },
-  list: function list(presences, chooser) {
-    if (!chooser) {
-      chooser = function chooser(key, pres) {
-        return pres;
-      };
-    }
-
-    return this.map(presences, function (key, presence) {
-      return chooser(key, presence);
+      var currentNewPresence = currentPresence.set('metas', currentMetas);
+      onLeave && onLeave(key, currentNewPresence, leftPresence);
+      return currentMetas.size ? state.set(key, currentNewPresence) : state.delete(key);
     });
   },
+  list: function list(state) {
+    var chooser = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : function (key, presence) {
+      return presence;
+    };
 
-
-  // private
-
-  map: function map(obj, func) {
-    return Object.getOwnPropertyNames(obj).map(function (key) {
-      return func(key, obj[key]);
-    });
-  },
-  clone: function clone(obj) {
-    return JSON.parse(JSON.stringify(obj));
+    return state.map(function (value, key) {
+      return chooser(key, value);
+    }).valueSeq();
   }
 };
 

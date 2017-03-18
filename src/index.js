@@ -207,11 +207,7 @@ export var Presence = {
     return this.syncDiff(state, {joins: joins, leaves: leaves}, onJoin, onLeave)
   },
 
-  syncDiff (currentState, {joins, leaves}, onJoin, onLeave) {
-    let state = currentState
-    if (!onJoin) { onJoin = function () {} }
-    if (!onLeave) { onLeave = function () {} }
-
+  syncDiff (state, {joins, leaves}, onJoin, onLeave) {
     state = reduce(state, joins, (state, key, newPresence) => {
       const currentPresence = state.get(key)
       newPresence = Immutable.fromJS(newPresence)
@@ -220,12 +216,12 @@ export var Presence = {
         const newMetas = currentPresence.get('metas').concat(newPresence.get('metas'))
         newPresence = newPresence.set('metas', newMetas)
       }
-      state = state.set(key, newPresence)
       // todo: should callbacks be allowed to mutate the state?
-      onJoin(key, currentPresence, newPresence)
-      return state
+      onJoin && onJoin(key, currentPresence, newPresence)
+      return state.set(key, newPresence)
     })
-    state = reduce(state, leaves, (state, key, leftPresence) => {
+
+    return reduce(state, leaves, (state, key, leftPresence) => {
       const currentPresence = state.get(key)
       if (!currentPresence) { return state }
       const refsToRemove = leftPresence.metas.map(m => m.phx_ref)
@@ -235,21 +231,12 @@ export var Presence = {
         return refsToRemove.indexOf(p.get('phx_ref')) < 0
       })
       const currentNewPresence = currentPresence.set('metas', currentMetas)
-      if (currentMetas.size === 0) {
-        state = state.delete(key)
-      } else {
-        state = state.set(key, currentNewPresence)
-      }
-      // todo: should callbacks be allowed to mutate the state?
-      onLeave(key, currentNewPresence, leftPresence)
-      return state
+      onLeave && onLeave(key, currentNewPresence, leftPresence)
+      return currentMetas.size ? state.set(key, currentNewPresence) : state.delete(key)
     })
-    return state
   },
 
-  list (presences, chooser) {
-    if (!chooser) { chooser = function (key, pres) { return pres } }
-    const state = presences
+  list (state, chooser = (key, presence) => presence) {
     return state.map((value, key) => {
       return chooser(key, value)
     }).valueSeq()

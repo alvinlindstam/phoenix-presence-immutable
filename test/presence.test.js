@@ -1,12 +1,14 @@
 import assert from 'assert'
 
 import Presence, {syncDiff, syncState, list} from '../src/index.js'
-import {Map, fromJS} from 'immutable'
+import Immutable, {Map, fromJS} from 'immutable'
 
 let clone = (obj) => { return JSON.parse(JSON.stringify(obj)) }
 
 const assertImmutableEquals = (expected, actual) => {
   // Test using Immutables equals method
+  assert(Immutable.isImmutable(expected))
+  assert(Immutable.isImmutable(actual))
   if (!expected.equals(actual)) {
     // Produce readable diffs
     assert.deepEqual(expected.toJS(), actual.toJS())
@@ -21,13 +23,11 @@ let fixtures = {
   leaves () {
     return {u2: {metas: [{id: 2, phx_ref: '2'}]}}
   },
-  state () {
-    return fromJS({
-      u1: {metas: [{id: 1, phx_ref: '1'}]},
-      u2: {metas: [{id: 2, phx_ref: '2'}]},
-      u3: {metas: [{id: 3, phx_ref: '3'}]}
-    })
-  }
+  state: fromJS({
+    u1: {metas: [{id: 1, phx_ref: '1'}]},
+    u2: {metas: [{id: 2, phx_ref: '2'}]},
+    u3: {metas: [{id: 3, phx_ref: '3'}]}
+  })
 }
 
 describe('exports', () => {
@@ -48,7 +48,7 @@ describe('syncState', () => {
   })
 
   it("onJoins new presences and onLeave's left presences", () => {
-    const newState = fixtures.state()
+    const newState = fixtures.state
     const state = fromJS({u4: {metas: [{id: 4, phx_ref: '4'}]}})
     let joined = {}
     let left = {}
@@ -101,28 +101,44 @@ describe('syncState', () => {
 describe('syncDiff', () => {
   it('does nothing without leaves or joins', () => {
     const state = new Map()
-    assertImmutableEquals(state, Presence.syncDiff(state, {joins: {}, leaves: {}}))
+    const newState = Presence.syncDiff(state, {joins: {}, leaves: {}})
+    assertImmutableEquals(state, newState)
+    // It should be the same object that is returned on no changes
+    assert(Object.is(state, newState))
   })
 
   it('syncs empty state', () => {
     let joins = {u1: {metas: [{id: 1, phx_ref: '1'}]}}
-    assertImmutableEquals(fromJS(joins), Presence.syncDiff(new Map({}), {joins: joins, leaves: {}}))
+    const oldState = new Map()
+    const newState = Presence.syncDiff(oldState, {joins: joins, leaves: {}})
+
+    assert(!Object.is(newState, oldState))
+    assertImmutableEquals(fromJS(joins), newState)
   })
 
   it('adds additional meta', () => {
-    let state = fixtures.state()
+    const state = fixtures.state
+    const newState = Presence.syncDiff(state, {joins: fixtures.joins(), leaves: {}})
     assertImmutableEquals(
       fromJS({
         u1: {metas: [{id: 1, phx_ref: '1'}, {id: 1, phx_ref: '1.2'}]},
         u2: {metas: [{id: 2, phx_ref: '2'}]},
         u3: {metas: [{id: 3, phx_ref: '3'}]}
       }),
-      Presence.syncDiff(state, {joins: fixtures.joins(), leaves: {}})
+      newState
     )
+    // Non changed items should have the same identity
+    assert(Object.is(newState.get('u2'), state.get('u2')))
+    assert(Object.is(newState.get('u3'), state.get('u3')))
+    assert(!Object.is(newState.get('u1'), state.get('u1')))
+    assert(Object.is(
+      newState.get('u1').get('metas').first(),
+      state.get('u1').get('metas').first()
+    ))
   })
 
   it('removes presence when meta is empty and adds additional meta', () => {
-    let state = fixtures.state()
+    let state = fixtures.state
     const newState = Presence.syncDiff(state, {joins: fixtures.joins(), leaves: fixtures.leaves()})
 
     assertImmutableEquals(
@@ -132,6 +148,13 @@ describe('syncDiff', () => {
       }),
       newState
     )
+    // Non changed items should have the same identity
+    assert(Object.is(newState.get('u3'), state.get('u3')))
+    assert(!Object.is(newState.get('u1'), state.get('u1')))
+    assert(Object.is(
+      newState.get('u1').get('metas').first(),
+      state.get('u1').get('metas').first()
+    ))
   })
 
   it('removes meta while leaving key if other metas exist', () => {
@@ -143,12 +166,18 @@ describe('syncDiff', () => {
       u1: {metas: [{id: 1, phx_ref: '1.2'}]}
     })
     assertImmutableEquals(expected, newState)
+    // Non changed items should have the same identity
+    assert(!Object.is(newState.get('u1'), state.get('u1')))
+    assert(Object.is(
+      newState.get('u1').get('metas').first(),
+      state.get('u1').get('metas').last()
+    ))
   })
 })
 
 describe('list', () => {
   it('lists full presence by default', () => {
-    const state = fixtures.state()
+    const state = fixtures.state
     const expected = fromJS([
       {metas: [{id: 1, phx_ref: '1'}]},
       {metas: [{id: 2, phx_ref: '2'}]},

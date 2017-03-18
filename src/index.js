@@ -167,81 +167,72 @@
 //     })
 //
 
-export var Presence = {
+import Immutable from 'immutable'
 
-  syncState (currentState, newState, onJoin, onLeave) {
-    let state = this.clone(currentState)
-    let joins = {}
-    let leaves = {}
+const emptyMap = new Immutable.Map()
 
-    this.map(state, (key, presence) => {
-      if (!newState[key]) {
-        leaves[key] = presence
-      }
-    })
-    this.map(newState, (key, newPresence) => {
-      let currentPresence = state[key]
-      if (currentPresence) {
-        let newRefs = newPresence.metas.map(m => m.phx_ref)
-        let curRefs = currentPresence.metas.map(m => m.phx_ref)
-        let joinedMetas = newPresence.metas.filter(m => curRefs.indexOf(m.phx_ref) < 0)
-        let leftMetas = currentPresence.metas.filter(m => newRefs.indexOf(m.phx_ref) < 0)
-        if (joinedMetas.length > 0) {
-          joins[key] = newPresence
-          joins[key].metas = joinedMetas
-        }
-        if (leftMetas.length > 0) {
-          leaves[key] = this.clone(currentPresence)
-          leaves[key].metas = leftMetas
-        }
-      } else {
-        joins[key] = newPresence
-      }
-    })
-    return this.syncDiff(state, {joins: joins, leaves: leaves}, onJoin, onLeave)
-  },
-
-  syncDiff (currentState, {joins, leaves}, onJoin, onLeave) {
-    let state = this.clone(currentState)
-    if (!onJoin) { onJoin = function () {} }
-    if (!onLeave) { onLeave = function () {} }
-
-    this.map(joins, (key, newPresence) => {
-      let currentPresence = state[key]
-      state[key] = newPresence
-      if (currentPresence) {
-        state[key].metas.unshift(...currentPresence.metas)
-      }
-      onJoin(key, currentPresence, newPresence)
-    })
-    this.map(leaves, (key, leftPresence) => {
-      let currentPresence = state[key]
-      if (!currentPresence) { return }
-      let refsToRemove = leftPresence.metas.map(m => m.phx_ref)
-      currentPresence.metas = currentPresence.metas.filter(p => {
-        return refsToRemove.indexOf(p.phx_ref) < 0
-      })
-      onLeave(key, currentPresence, leftPresence)
-      if (currentPresence.metas.length === 0) {
-        delete state[key]
-      }
-    })
-    return state
-  },
-
-  list (presences, chooser) {
-    if (!chooser) { chooser = function (key, pres) { return pres } }
-
-    return this.map(presences, (key, presence) => {
-      return chooser(key, presence)
-    })
-  },
-
-  // private
-
-  map (obj, func) {
-    return Object.getOwnPropertyNames(obj).map(key => func(key, obj[key]))
-  },
-
-  clone (obj) { return JSON.parse(JSON.stringify(obj)) }
+// Takes two immutable presence objects and returns all metas in the second that are not in the first
+const extractMetas = (comparedPresence, newPresence) => {
+  const compRefs = comparedPresence.get('metas').map(m => m.get('phx_ref'))
+  const newMetas = newPresence.get('metas').filterNot(m => compRefs.includes(m.get('phx_ref')))
+  return emptyMap.set('metas', newMetas)
 }
+
+export const syncState = function(oldState, newState, onJoin, onLeave) {
+    newState = Immutable.fromJS(newState)
+
+    const newByDiff = newState.groupBy((value, key) => oldState.has(key) ? 'collision' : 'new')
+    const inCollisions = newByDiff.get('collision', emptyMap)
+
+    // for all keys found in both oldState and newState, find the metas that are only in one of them
+    const onlyInOld = inCollisions.map((newPresence, key) => extractMetas(newPresence, oldState.get(key)))
+    const onlyInNew = inCollisions.map((newPresence, key) => extractMetas(oldState.get(key), newPresence))
+
+    const allNewPresences = newByDiff.get('new', emptyMap)
+    const notFoundPresences = oldState.filterNot((_presence, key) => newState.has(key))
+
+    return syncDiff(oldState, {
+      joins: allNewPresences.merge(onlyInNew),
+      leaves: notFoundPresences.merge(onlyInOld)
+    }, onJoin, onLeave)
+  }
+
+export const syncDiff = function (state, {joins, leaves}, onJoin, onLeave) {
+    const immutableJoins = Immutable.isCollection(joins) ? joins : Immutable.fromJS(joins)
+    const immutableLeaves = Immutable.isCollection(leaves) ? leaves : Immutable.fromJS(leaves)
+
+    state = immutableJoins.reduce((state, newPresence, key) => {
+      const currentPresence = state.get(key)
+      if (currentPresence) {
+        newPresence = newPresence.set('metas', currentPresence.get('metas').concat(newPresence.get('metas')))
+      }
+      if (onJoin) { onJoin(key, currentPresence, newPresence) }
+      return state.set(key, newPresence)
+    }, state)
+
+    return immutableLeaves.reduce((state, leftPresence, key) => {
+      const currentPresence = state.get(key)
+      if (!currentPresence) { return state }
+
+      const refsToRemove = leftPresence.get('metas').map(m => m.get('phx_ref'))
+
+      const currentMetas = currentPresence.get('metas').filterNot(p => refsToRemove.includes(p.get('phx_ref')))
+      const currentNewPresence = currentPresence.set('metas', currentMetas)
+      if (onLeave) { onLeave(key, currentNewPresence, leftPresence) }
+      return currentMetas.size ? state.set(key, currentNewPresence) : state.delete(key)
+    }, state)
+  }
+
+export const list = function (state, chooser = (key, presence) => presence) {
+  return state.map((value, key) => {
+    return chooser(key, value)
+  }).valueSeq()
+}
+
+const ImmutablePresence = {
+  syncState: syncState,
+  syncDiff: syncDiff,
+  list: list
+}
+
+export default ImmutablePresence

@@ -2,128 +2,9 @@
 
 Object.defineProperty(exports, '__esModule', { value: true });
 
-var asyncGenerator = function () {
-  function AwaitValue(value) {
-    this.value = value;
-  }
+function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
-  function AsyncGenerator(gen) {
-    var front, back;
-
-    function send(key, arg) {
-      return new Promise(function (resolve, reject) {
-        var request = {
-          key: key,
-          arg: arg,
-          resolve: resolve,
-          reject: reject,
-          next: null
-        };
-
-        if (back) {
-          back = back.next = request;
-        } else {
-          front = back = request;
-          resume(key, arg);
-        }
-      });
-    }
-
-    function resume(key, arg) {
-      try {
-        var result = gen[key](arg);
-        var value = result.value;
-
-        if (value instanceof AwaitValue) {
-          Promise.resolve(value.value).then(function (arg) {
-            resume("next", arg);
-          }, function (arg) {
-            resume("throw", arg);
-          });
-        } else {
-          settle(result.done ? "return" : "normal", result.value);
-        }
-      } catch (err) {
-        settle("throw", err);
-      }
-    }
-
-    function settle(type, value) {
-      switch (type) {
-        case "return":
-          front.resolve({
-            value: value,
-            done: true
-          });
-          break;
-
-        case "throw":
-          front.reject(value);
-          break;
-
-        default:
-          front.resolve({
-            value: value,
-            done: false
-          });
-          break;
-      }
-
-      front = front.next;
-
-      if (front) {
-        resume(front.key, front.arg);
-      } else {
-        back = null;
-      }
-    }
-
-    this._invoke = send;
-
-    if (typeof gen.return !== "function") {
-      this.return = undefined;
-    }
-  }
-
-  if (typeof Symbol === "function" && Symbol.asyncIterator) {
-    AsyncGenerator.prototype[Symbol.asyncIterator] = function () {
-      return this;
-    };
-  }
-
-  AsyncGenerator.prototype.next = function (arg) {
-    return this._invoke("next", arg);
-  };
-
-  AsyncGenerator.prototype.throw = function (arg) {
-    return this._invoke("throw", arg);
-  };
-
-  AsyncGenerator.prototype.return = function (arg) {
-    return this._invoke("return", arg);
-  };
-
-  return {
-    wrap: function (fn) {
-      return function () {
-        return new AsyncGenerator(fn.apply(this, arguments));
-      };
-    },
-    await: function (value) {
-      return new AwaitValue(value);
-    }
-  };
-}();
-
-var toConsumableArray = function (arr) {
-  if (Array.isArray(arr)) {
-    for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) arr2[i] = arr[i];
-
-    return arr2;
-  } else {
-    return Array.from(arr);
-  }
-};
+var Immutable = _interopDefault(require('immutable'));
 
 // Phoenix Channels JavaScript client
 //
@@ -294,111 +175,102 @@ var toConsumableArray = function (arr) {
 //     })
 //
 
-var Presence = {
-  syncState: function syncState(currentState, newState, onJoin, onLeave) {
-    var _this = this;
+var emptyMap = new Immutable.Map();
 
-    var state = this.clone(currentState);
-    var joins = {};
-    var leaves = {};
-
-    this.map(state, function (key, presence) {
-      if (!newState[key]) {
-        leaves[key] = presence;
-      }
-    });
-    this.map(newState, function (key, newPresence) {
-      var currentPresence = state[key];
-      if (currentPresence) {
-        var newRefs = newPresence.metas.map(function (m) {
-          return m.phx_ref;
-        });
-        var curRefs = currentPresence.metas.map(function (m) {
-          return m.phx_ref;
-        });
-        var joinedMetas = newPresence.metas.filter(function (m) {
-          return curRefs.indexOf(m.phx_ref) < 0;
-        });
-        var leftMetas = currentPresence.metas.filter(function (m) {
-          return newRefs.indexOf(m.phx_ref) < 0;
-        });
-        if (joinedMetas.length > 0) {
-          joins[key] = newPresence;
-          joins[key].metas = joinedMetas;
-        }
-        if (leftMetas.length > 0) {
-          leaves[key] = _this.clone(currentPresence);
-          leaves[key].metas = leftMetas;
-        }
-      } else {
-        joins[key] = newPresence;
-      }
-    });
-    return this.syncDiff(state, { joins: joins, leaves: leaves }, onJoin, onLeave);
-  },
-  syncDiff: function syncDiff(currentState, _ref, onJoin, onLeave) {
-    var joins = _ref.joins,
-        leaves = _ref.leaves;
-
-    var state = this.clone(currentState);
-    if (!onJoin) {
-      onJoin = function onJoin() {};
-    }
-    if (!onLeave) {
-      onLeave = function onLeave() {};
-    }
-
-    this.map(joins, function (key, newPresence) {
-      var currentPresence = state[key];
-      state[key] = newPresence;
-      if (currentPresence) {
-        var _state$key$metas;
-
-        (_state$key$metas = state[key].metas).unshift.apply(_state$key$metas, toConsumableArray(currentPresence.metas));
-      }
-      onJoin(key, currentPresence, newPresence);
-    });
-    this.map(leaves, function (key, leftPresence) {
-      var currentPresence = state[key];
-      if (!currentPresence) {
-        return;
-      }
-      var refsToRemove = leftPresence.metas.map(function (m) {
-        return m.phx_ref;
-      });
-      currentPresence.metas = currentPresence.metas.filter(function (p) {
-        return refsToRemove.indexOf(p.phx_ref) < 0;
-      });
-      onLeave(key, currentPresence, leftPresence);
-      if (currentPresence.metas.length === 0) {
-        delete state[key];
-      }
-    });
-    return state;
-  },
-  list: function list(presences, chooser) {
-    if (!chooser) {
-      chooser = function chooser(key, pres) {
-        return pres;
-      };
-    }
-
-    return this.map(presences, function (key, presence) {
-      return chooser(key, presence);
-    });
-  },
-
-
-  // private
-
-  map: function map(obj, func) {
-    return Object.getOwnPropertyNames(obj).map(function (key) {
-      return func(key, obj[key]);
-    });
-  },
-  clone: function clone(obj) {
-    return JSON.parse(JSON.stringify(obj));
-  }
+// Takes two immutable presence objects and returns all metas in the second that are not in the first
+var extractMetas = function extractMetas(comparedPresence, newPresence) {
+  var compRefs = comparedPresence.get('metas').map(function (m) {
+    return m.get('phx_ref');
+  });
+  var newMetas = newPresence.get('metas').filterNot(function (m) {
+    return compRefs.includes(m.get('phx_ref'));
+  });
+  return emptyMap.set('metas', newMetas);
 };
 
-exports.Presence = Presence;
+var syncState = function syncState(oldState, newState, onJoin, onLeave) {
+  newState = Immutable.fromJS(newState);
+
+  var newByDiff = newState.groupBy(function (value, key) {
+    return oldState.has(key) ? 'collision' : 'new';
+  });
+  var inCollisions = newByDiff.get('collision', emptyMap);
+
+  // for all keys found in both oldState and newState, find the metas that are only in one of them
+  var onlyInOld = inCollisions.map(function (newPresence, key) {
+    return extractMetas(newPresence, oldState.get(key));
+  });
+  var onlyInNew = inCollisions.map(function (newPresence, key) {
+    return extractMetas(oldState.get(key), newPresence);
+  });
+
+  var allNewPresences = newByDiff.get('new', emptyMap);
+  var notFoundPresences = oldState.filterNot(function (_presence, key) {
+    return newState.has(key);
+  });
+
+  return syncDiff(oldState, {
+    joins: allNewPresences.merge(onlyInNew),
+    leaves: notFoundPresences.merge(onlyInOld)
+  }, onJoin, onLeave);
+};
+
+var syncDiff = function syncDiff(state, _ref, onJoin, onLeave) {
+  var joins = _ref.joins,
+      leaves = _ref.leaves;
+
+  var immutableJoins = Immutable.isCollection(joins) ? joins : Immutable.fromJS(joins);
+  var immutableLeaves = Immutable.isCollection(leaves) ? leaves : Immutable.fromJS(leaves);
+
+  state = immutableJoins.reduce(function (state, newPresence, key) {
+    var currentPresence = state.get(key);
+    if (currentPresence) {
+      newPresence = newPresence.set('metas', currentPresence.get('metas').concat(newPresence.get('metas')));
+    }
+    if (onJoin) {
+      onJoin(key, currentPresence, newPresence);
+    }
+    return state.set(key, newPresence);
+  }, state);
+
+  return immutableLeaves.reduce(function (state, leftPresence, key) {
+    var currentPresence = state.get(key);
+    if (!currentPresence) {
+      return state;
+    }
+
+    var refsToRemove = leftPresence.get('metas').map(function (m) {
+      return m.get('phx_ref');
+    });
+
+    var currentMetas = currentPresence.get('metas').filterNot(function (p) {
+      return refsToRemove.includes(p.get('phx_ref'));
+    });
+    var currentNewPresence = currentPresence.set('metas', currentMetas);
+    if (onLeave) {
+      onLeave(key, currentNewPresence, leftPresence);
+    }
+    return currentMetas.size ? state.set(key, currentNewPresence) : state.delete(key);
+  }, state);
+};
+
+var list = function list(state) {
+  var chooser = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : function (key, presence) {
+    return presence;
+  };
+
+  return state.map(function (value, key) {
+    return chooser(key, value);
+  }).valueSeq();
+};
+
+var ImmutablePresence = {
+  syncState: syncState,
+  syncDiff: syncDiff,
+  list: list
+};
+
+exports.syncState = syncState;
+exports.syncDiff = syncDiff;
+exports.list = list;
+exports['default'] = ImmutablePresence;

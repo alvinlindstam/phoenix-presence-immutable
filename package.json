@@ -33,6 +33,8 @@
     "babel-plugin-transform-react-jsx": "^6.8.0",
     "babel-preset-es2015": "^6.14.0",
     "babel-preset-es2015-rollup": "^1.2.0",
+    "immutable": "^4.0.0-rc.1",
+    "immutable-js": "^0.3.1-6",
     "mocha": "^3.0.2",
     "npm-watch": "^0.1.6",
     "nyc": "^8.1.0",
@@ -51,5 +53,8 @@
       "it"
     ]
   },
-  "homepage": "https://github.com/alvinlindstam/phoenix-presence-immutable#readme"
+  "homepage": "https://github.com/alvinlindstam/phoenix-presence-immutable#readme",
+  "browser": {
+    "immutable": false
+  }
 }

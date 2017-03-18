@@ -169,10 +169,6 @@
 
 import Immutable from 'immutable'
 
-const reduce = function (state, obj, func) {
-  const keys = Object.getOwnPropertyNames(obj)
-  return keys.reduce((state, key) => func(state, key, obj[key]), state)
-}
 
 export var Presence = {
 
@@ -208,32 +204,29 @@ export var Presence = {
   },
 
   syncDiff (state, {joins, leaves}, onJoin, onLeave) {
-    state = reduce(state, joins, (state, key, newPresence) => {
+    const immutableJoins = Immutable.fromJS(joins)
+    const immutableLeaves = Immutable.fromJS(leaves)
+
+    state = immutableJoins.reduce((state, newPresence, key) => {
       const currentPresence = state.get(key)
-      newPresence = Immutable.fromJS(newPresence)
-
       if (currentPresence) {
-        const newMetas = currentPresence.get('metas').concat(newPresence.get('metas'))
-        newPresence = newPresence.set('metas', newMetas)
+        newPresence = newPresence.set('metas', currentPresence.get('metas').concat(newPresence.get('metas')))
       }
-      // todo: should callbacks be allowed to mutate the state?
-      onJoin && onJoin(key, currentPresence, newPresence)
+      if (onJoin) {onJoin(key, currentPresence, newPresence)}
       return state.set(key, newPresence)
-    })
+    }, state)
 
-    return reduce(state, leaves, (state, key, leftPresence) => {
+    return immutableLeaves.reduce((state, leftPresence, key) => {
       const currentPresence = state.get(key)
       if (!currentPresence) { return state }
-      const refsToRemove = leftPresence.metas.map(m => m.phx_ref)
 
-      leftPresence = Immutable.fromJS(leftPresence)
-      const currentMetas = currentPresence.get('metas').filter(p => {
-        return refsToRemove.indexOf(p.get('phx_ref')) < 0
-      })
+      const refsToRemove = leftPresence.get('metas').map(m => m.get('phx_ref'))
+
+      const currentMetas = currentPresence.get('metas').filterNot(p => refsToRemove.includes(p.get('phx_ref')))
       const currentNewPresence = currentPresence.set('metas', currentMetas)
-      onLeave && onLeave(key, currentNewPresence, leftPresence)
+      if (onLeave) { onLeave(key, currentNewPresence, leftPresence) }
       return currentMetas.size ? state.set(key, currentNewPresence) : state.delete(key)
-    })
+    }, state)
   },
 
   list (state, chooser = (key, presence) => presence) {

@@ -7,7 +7,7 @@ let clone = (obj) => { return JSON.parse(JSON.stringify(obj)) }
 
 const assertImmutableEquals = (expected, actual) => {
   // Test using Immutables equals method
-  if (!expected.equals(actual)){
+  if (!expected.equals(actual)) {
     // Produce readable diffs
     assert.deepEqual(expected.toJS(), actual.toJS())
     // failsafe, if toJS somehow was equals

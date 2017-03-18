@@ -175,13 +175,6 @@ var Immutable = _interopDefault(require('immutable'));
 //     })
 //
 
-var reduce = function reduce(state, obj, func) {
-  var keys = Object.getOwnPropertyNames(obj);
-  return keys.reduce(function (state, key) {
-    return func(state, key, obj[key]);
-  }, state);
-};
-
 var Presence = {
   syncState: function syncState(currentState, newState, onJoin, onLeave) {
     var state = currentState;
@@ -227,36 +220,39 @@ var Presence = {
     var joins = _ref.joins,
         leaves = _ref.leaves;
 
-    state = reduce(state, joins, function (state, key, newPresence) {
+    var immutableJoins = Immutable.fromJS(joins);
+    var immutableLeaves = Immutable.fromJS(leaves);
+
+    state = immutableJoins.reduce(function (state, newPresence, key) {
       var currentPresence = state.get(key);
-      newPresence = Immutable.fromJS(newPresence);
-
       if (currentPresence) {
-        var newMetas = currentPresence.get('metas').concat(newPresence.get('metas'));
-        newPresence = newPresence.set('metas', newMetas);
+        newPresence = newPresence.set('metas', currentPresence.get('metas').concat(newPresence.get('metas')));
       }
-      // todo: should callbacks be allowed to mutate the state?
-      onJoin && onJoin(key, currentPresence, newPresence);
+      if (onJoin) {
+        onJoin(key, currentPresence, newPresence);
+      }
       return state.set(key, newPresence);
-    });
+    }, state);
 
-    return reduce(state, leaves, function (state, key, leftPresence) {
+    return immutableLeaves.reduce(function (state, leftPresence, key) {
       var currentPresence = state.get(key);
       if (!currentPresence) {
         return state;
       }
-      var refsToRemove = leftPresence.metas.map(function (m) {
-        return m.phx_ref;
+
+      var refsToRemove = leftPresence.get('metas').map(function (m) {
+        return m.get('phx_ref');
       });
 
-      leftPresence = Immutable.fromJS(leftPresence);
-      var currentMetas = currentPresence.get('metas').filter(function (p) {
-        return refsToRemove.indexOf(p.get('phx_ref')) < 0;
+      var currentMetas = currentPresence.get('metas').filterNot(function (p) {
+        return refsToRemove.includes(p.get('phx_ref'));
       });
       var currentNewPresence = currentPresence.set('metas', currentMetas);
-      onLeave && onLeave(key, currentNewPresence, leftPresence);
+      if (onLeave) {
+        onLeave(key, currentNewPresence, leftPresence);
+      }
       return currentMetas.size ? state.set(key, currentNewPresence) : state.delete(key);
-    });
+    }, state);
   },
   list: function list(state) {
     var chooser = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : function (key, presence) {

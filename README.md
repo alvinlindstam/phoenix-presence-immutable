@@ -13,6 +13,7 @@
 
 # phoenix-presence-immutable
 
+Helper library for managing Phoenix Presence state using Immutable.js.
 
 ## Usage
 

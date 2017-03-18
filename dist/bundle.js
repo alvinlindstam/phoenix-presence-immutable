@@ -175,46 +175,40 @@ var Immutable = _interopDefault(require('immutable'));
 //     })
 //
 
+var emptyMap = new Immutable.Map();
+
+// Takes two immutable presence objects and returns all metas in the second that are not in the first
+var extractMetas = function extractMetas(comparedPresence, newPresence) {
+  var compRefs = comparedPresence.get('metas').map(function (m) {
+    return m.get('phx_ref');
+  });
+  var newMetas = newPresence.get('metas').filterNot(function (m) {
+    return compRefs.includes(m.get('phx_ref'));
+  });
+  return emptyMap.set('metas', newMetas);
+};
+
 var Presence = {
-  syncState: function syncState(currentState, newState, onJoin, onLeave) {
-    var state = currentState;
+  syncState: function syncState(oldState, newState, onJoin, onLeave) {
     newState = Immutable.fromJS(newState);
-    var joins = {};
 
-    var leaves = state.filterNot(function (_presence, key) {
-      return newState.has(key);
-    }).toJS();
-    newState.map(function (newPresence, key) {
-      var currentPresence = state.get(key);
-      if (currentPresence) {
-        var newRefs = newPresence.get('metas').map(function (m) {
-          return m.get('phx_ref');
-        });
-        var curRefs = currentPresence.get('metas').map(function (m) {
-          return m.get('phx_ref');
-        });
-        var joinedMetas = newPresence.get('metas').filter(function (m) {
-          return curRefs.indexOf(m.get('phx_ref')) < 0;
-        });
-        var leftMetas = currentPresence.get('metas').filter(function (m) {
-          return newRefs.indexOf(m.get('phx_ref')) < 0;
-        });
-
-        if (joinedMetas.size > 0) {
-          joins[key] = newPresence.toJS();
-          joins[key].metas = joinedMetas.toJS();
-        }
-
-        if (leftMetas.size > 0) {
-          leaves[key] = currentPresence.toJS();
-          leaves[key].metas = leftMetas.toJS();
-        }
-      } else {
-        joins[key] = newPresence.toJS();
-      }
+    var newByDiff = newState.groupBy(function (value, key) {
+      return oldState.has(key) ? 'collision' : 'new';
     });
 
-    return this.syncDiff(state, { joins: joins, leaves: leaves }, onJoin, onLeave);
+    var leavesInCollisions = newByDiff.get('collision', emptyMap).map(function (newPresence, key) {
+      return extractMetas(newPresence, oldState.get(key));
+    });
+    var leaves = oldState.filterNot(function (_presence, key) {
+      return newState.has(key);
+    }).merge(leavesInCollisions);
+
+    var joinsInCollisions = newByDiff.get('collision', emptyMap).map(function (newPresence, key) {
+      return extractMetas(oldState.get(key), newPresence);
+    });
+    var joins = newByDiff.get('new', emptyMap).merge(joinsInCollisions);
+
+    return this.syncDiff(oldState, { joins: joins.toJS(), leaves: leaves.toJS() }, onJoin, onLeave);
   },
   syncDiff: function syncDiff(state, _ref, onJoin, onLeave) {
     var joins = _ref.joins,

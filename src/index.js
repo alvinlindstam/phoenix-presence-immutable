@@ -169,38 +169,31 @@
 
 import Immutable from 'immutable'
 
+const emptyMap = new Immutable.Map()
+
+// Takes two immutable presence objects and returns all metas in the second that are not in the first
+const extractMetas = (comparedPresence, newPresence) => {
+  const compRefs = comparedPresence.get('metas').map(m => m.get('phx_ref'))
+  const newMetas = newPresence.get('metas').filterNot(m => compRefs.includes(m.get('phx_ref')))
+  return emptyMap.set('metas', newMetas)
+}
 
 export var Presence = {
 
-  syncState (currentState, newState, onJoin, onLeave) {
-    let state = currentState
+  syncState (oldState, newState, onJoin, onLeave) {
     newState = Immutable.fromJS(newState)
-    let joins = {}
 
-    let leaves = state.filterNot((_presence, key) => newState.has(key)).toJS()
-    newState.map((newPresence, key) => {
-      let currentPresence = state.get(key)
-      if (currentPresence) {
-        let newRefs = newPresence.get('metas').map(m => m.get('phx_ref'))
-        let curRefs = currentPresence.get('metas').map(m => m.get('phx_ref'))
-        let joinedMetas = newPresence.get('metas').filter(m => curRefs.indexOf(m.get('phx_ref')) < 0)
-        let leftMetas = currentPresence.get('metas').filter(m => newRefs.indexOf(m.get('phx_ref')) < 0)
+    const newByDiff = newState.groupBy((value, key) => oldState.has(key) ? 'collision' : 'new')
+    const inCollisions = newByDiff.get('collision', emptyMap)
 
-        if (joinedMetas.size > 0) {
-          joins[key] = newPresence.toJS()
-          joins[key].metas = joinedMetas.toJS()
-        }
+    // for all keys found in both oldState and newState, find the metas that are only in one of them
+    const onlyInOld = inCollisions.map((newPresence, key) => extractMetas(newPresence, oldState.get(key)))
+    const onlyInNew = inCollisions.map((newPresence, key) => extractMetas(oldState.get(key), newPresence))
 
-        if (leftMetas.size > 0) {
-          leaves[key] = currentPresence.toJS()
-          leaves[key].metas = leftMetas.toJS()
-        }
-      } else {
-        joins[key] = newPresence.toJS()
-      }
-    })
+    const leaves = oldState.filterNot((_presence, key) => newState.has(key)).merge(onlyInOld)
+    const joins = newByDiff.get('new', emptyMap).merge(onlyInNew)
 
-    return this.syncDiff(state, {joins: joins, leaves: leaves}, onJoin, onLeave)
+    return this.syncDiff(oldState, {joins: joins.toJS(), leaves: leaves.toJS()}, onJoin, onLeave)
   },
 
   syncDiff (state, {joins, leaves}, onJoin, onLeave) {
@@ -212,7 +205,7 @@ export var Presence = {
       if (currentPresence) {
         newPresence = newPresence.set('metas', currentPresence.get('metas').concat(newPresence.get('metas')))
       }
-      if (onJoin) {onJoin(key, currentPresence, newPresence)}
+      if (onJoin) { onJoin(key, currentPresence, newPresence) }
       return state.set(key, newPresence)
     }, state)
 

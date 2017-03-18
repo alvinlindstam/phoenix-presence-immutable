@@ -76,6 +76,9 @@ import Immutable from 'immutable'
 
 const emptyMap = new Immutable.Map()
 
+// Immutable 4 compatibility
+const isImmutable = Immutable.isImmutable || Immutable.Iterable.isIterable
+
 // Takes two immutable presence objects and returns all metas in the second that are not in the first
 const extractMetas = (comparedPresence, newPresence) => {
   const compRefs = comparedPresence.get('metas').map(m => m.get('phx_ref'))
@@ -103,8 +106,8 @@ export const syncState = function(oldState, newState, onJoin, onLeave) {
   }
 
 export const syncDiff = function (state, {joins, leaves}, onJoin, onLeave) {
-    const immutableJoins = Immutable.isCollection(joins) ? joins : Immutable.fromJS(joins)
-    const immutableLeaves = Immutable.isCollection(leaves) ? leaves : Immutable.fromJS(leaves)
+    const immutableJoins = isImmutable(joins) ? joins : Immutable.fromJS(joins)
+    const immutableLeaves = isImmutable(leaves) ? leaves : Immutable.fromJS(leaves)
 
     state = immutableJoins.reduce((state, newPresence, key) => {
       const currentPresence = state.get(key)

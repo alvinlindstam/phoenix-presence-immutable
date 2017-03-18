@@ -3,12 +3,12 @@ import assert from 'assert'
 import Presence, {syncDiff, syncState, list} from '../src/index.js'
 import Immutable, {Map, fromJS} from 'immutable'
 
-let clone = (obj) => { return JSON.parse(JSON.stringify(obj)) }
+const isImmutable = Immutable.isImmutable || Immutable.Iterable.isIterable
 
 const assertImmutableEquals = (expected, actual) => {
   // Test using Immutables equals method
-  assert(Immutable.isImmutable(expected))
-  assert(Immutable.isImmutable(actual))
+  assert(isImmutable(expected))
+  assert(isImmutable(actual))
   if (!expected.equals(actual)) {
     // Produce readable diffs
     assert.deepEqual(expected.toJS(), actual.toJS())

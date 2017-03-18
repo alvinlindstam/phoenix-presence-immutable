@@ -82,6 +82,9 @@ var Immutable = _interopDefault(require('immutable'));
 
 var emptyMap = new Immutable.Map();
 
+// Immutable 4 compatibility
+var isImmutable = Immutable.isImmutable || Immutable.Iterable.isIterable;
+
 // Takes two immutable presence objects and returns all metas in the second that are not in the first
 var extractMetas = function extractMetas(comparedPresence, newPresence) {
   var compRefs = comparedPresence.get('metas').map(function (m) {
@@ -124,8 +127,8 @@ var syncDiff = function syncDiff(state, _ref, onJoin, onLeave) {
   var joins = _ref.joins,
       leaves = _ref.leaves;
 
-  var immutableJoins = Immutable.isCollection(joins) ? joins : Immutable.fromJS(joins);
-  var immutableLeaves = Immutable.isCollection(leaves) ? leaves : Immutable.fromJS(leaves);
+  var immutableJoins = isImmutable(joins) ? joins : Immutable.fromJS(joins);
+  var immutableLeaves = isImmutable(leaves) ? leaves : Immutable.fromJS(leaves);
 
   state = immutableJoins.reduce(function (state, newPresence, key) {
     var currentPresence = state.get(key);

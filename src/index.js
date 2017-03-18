@@ -249,17 +249,9 @@ export var Presence = {
 
   list (presences, chooser) {
     if (!chooser) { chooser = function (key, pres) { return pres } }
-
-    return this.map(presences, (key, presence) => {
-      return chooser(key, presence)
-    })
-  },
-
-  // private
-
-  map (obj, func) {
-    return Object.getOwnPropertyNames(obj).map(key => func(key, obj[key]))
-  },
-
-  clone (obj) { return JSON.parse(JSON.stringify(obj)) }
+    const state = presences
+    return state.map((value, key) => {
+      return chooser(key, value)
+    }).valueSeq()
+  }
 }

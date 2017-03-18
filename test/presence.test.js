@@ -5,6 +5,15 @@ import {Map, fromJS} from 'immutable'
 
 let clone = (obj) => { return JSON.parse(JSON.stringify(obj)) }
 
+const assertImmutableEquals = (expected, actual) => {
+  // Test using Immutables equals method
+  if (!expected.equals(actual)){
+    // Produce readable diffs
+    assert.deepEqual(expected.toJS(), actual.toJS())
+    // failsafe, if toJS somehow was equals
+    assert(expected.equals(actual))
+  }
+}
 let fixtures = {
   joins () {
     return {u1: {metas: [{id: 1, phx_ref: '1.2'}]}}
@@ -129,26 +138,24 @@ describe('syncDiff', () => {
 
 describe('list', () => {
   it('lists full presence by default', () => {
-    let state = fixtures.state()
-    assert.deepEqual(Presence.list(state), [
+    const state = fixtures.immutableState()
+    const expected = fromJS([
       {metas: [{id: 1, phx_ref: '1'}]},
       {metas: [{id: 2, phx_ref: '2'}]},
       {metas: [{id: 3, phx_ref: '3'}]}
     ])
+    assertImmutableEquals(expected, Presence.list(state))
   })
 
   it('lists with custom function', () => {
-    let state = {u1: {metas: [
+    let state = fromJS({u1: {metas: [
       {id: 1, phx_ref: '1.first'},
       {id: 1, phx_ref: '1.second'}]
-    }}
+    }})
 
-    let listBy = (key, {metas: [first, ...rest]}) => {
-      return first
-    }
-
-    assert.deepEqual(Presence.list(state, listBy), [
-      {id: 1, phx_ref: '1.first'}
-    ])
+    assertImmutableEquals(
+      fromJS([{id: 1, phx_ref: '1.first'}]),
+      Presence.list(state, (_key, value) => value.get('metas').first())
+    )
   })
 })

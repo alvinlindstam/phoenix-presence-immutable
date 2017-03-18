@@ -39,7 +39,7 @@ describe('syncState', () => {
     const state = new Map()
     const newState = Presence.syncState(state, newStateData)
     assert.deepEqual(state, new Map())
-    assert.deepEqual(newState.toJS(), newStateData)
+    assertImmutableEquals(fromJS(newStateData), newState)
   })
 
   it("onJoins new presences and onLeave's left presences", () => {
@@ -54,7 +54,7 @@ describe('syncState', () => {
       left[key] = {current: current && current.toJS(), leftPres: leftPres.toJS()}
     }
     const syncedState = Presence.syncState(state, newState, onJoin, onLeave)
-    assert(syncedState.equals(newState))
+    assertImmutableEquals(newState, syncedState)
     assert.deepEqual(joined, {
       u1: {current: null, newPres: {metas: [{id: 1, phx_ref: '1'}]}},
       u2: {current: null, newPres: {metas: [{id: 2, phx_ref: '2'}]}},
@@ -77,9 +77,7 @@ describe('syncState', () => {
       left[key] = {current: current && current.toJS(), leftPres: leftPres.toJS()}
     }
     const syncedState = Presence.syncState(state, newState, onJoin, onLeave)
-    if (!syncedState.equals(newState)) {
-      assert.deepEqual(syncedState.toJS(), newState.toJS())
-    }
+    assertImmutableEquals(newState, syncedState)
     assert.deepEqual(joined, {
       u3: {current: {metas: [{id: 3, phx_ref: '3'}]},
         newPres: {metas: [{id: 3, phx_ref: '3'}, {id: 3, phx_ref: '3.new'}]}}
@@ -91,37 +89,37 @@ describe('syncState', () => {
 describe('syncDiff', () => {
   it('does nothing without leaves or joins', () => {
     const state = new Map()
-    const newState = Presence.syncDiff(state, {joins: {}, leaves: {}})
-    assert.deepEqual(newState, state)
+    assertImmutableEquals(state, Presence.syncDiff(state, {joins: {}, leaves: {}}))
   })
 
   it('syncs empty state', () => {
     let joins = {u1: {metas: [{id: 1, phx_ref: '1'}]}}
-    const state = new Map({})
-    const newState = Presence.syncDiff(state, {joins: joins, leaves: {}})
-    assert.deepEqual(joins, newState.toJS())
+    assertImmutableEquals(fromJS(joins), Presence.syncDiff(new Map({}), {joins: joins, leaves: {}}))
   })
 
   it('adds additional meta', () => {
     let state = fixtures.immutableState()
-    const newState = Presence.syncDiff(state, {joins: fixtures.joins(), leaves: {}})
-
-    assert.deepEqual({
-      u1: {metas: [{id: 1, phx_ref: '1'}, {id: 1, phx_ref: '1.2'}]},
-      u2: {metas: [{id: 2, phx_ref: '2'}]},
-      u3: {metas: [{id: 3, phx_ref: '3'}]}
-    }, newState.toJS())
+    assertImmutableEquals(
+      fromJS({
+        u1: {metas: [{id: 1, phx_ref: '1'}, {id: 1, phx_ref: '1.2'}]},
+        u2: {metas: [{id: 2, phx_ref: '2'}]},
+        u3: {metas: [{id: 3, phx_ref: '3'}]}
+      }),
+      Presence.syncDiff(state, {joins: fixtures.joins(), leaves: {}})
+    )
   })
 
   it('removes presence when meta is empty and adds additional meta', () => {
     let state = fixtures.immutableState()
     const newState = Presence.syncDiff(state, {joins: fixtures.joins(), leaves: fixtures.leaves()})
 
-    assert.deepEqual({
-      u1: {metas: [{id: 1, phx_ref: '1'}, {id: 1, phx_ref: '1.2'}]},
-      u3: {metas: [{id: 3, phx_ref: '3'}]}
-    },
-    newState.toJS())
+    assertImmutableEquals(
+      fromJS({
+        u1: {metas: [{id: 1, phx_ref: '1'}, {id: 1, phx_ref: '1.2'}]},
+        u3: {metas: [{id: 3, phx_ref: '3'}]}
+      }),
+      newState
+    )
   })
 
   it('removes meta while leaving key if other metas exist', () => {
@@ -129,10 +127,10 @@ describe('syncDiff', () => {
       u1: {metas: [{id: 1, phx_ref: '1'}, {id: 1, phx_ref: '1.2'}]}
     })
     const newState = Presence.syncDiff(state, {joins: {}, leaves: {u1: {metas: [{id: 1, phx_ref: '1'}]}}})
-
-    assert.deepEqual({
+    const expected = fromJS({
       u1: {metas: [{id: 1, phx_ref: '1.2'}]}
-    }, newState.toJS())
+    })
+    assertImmutableEquals(expected, newState)
   })
 })
 

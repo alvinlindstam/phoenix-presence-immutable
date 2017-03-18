@@ -6,7 +6,6 @@
     "build": "rollup -c",
     "build-mocha": "npm run build && npm run mocha",
     "dev": "webpack-dev-server --config webpack.dev.config.js --content-base dev/ --hot --inline",
-    "semantic-release": "semantic-release pre && npm publish && semantic-release post",
     "test": "standard src/** && npm run mocha",
     "mocha": "mocha -r babel-core/register test/**",
     "coverage": "nyc node_modules/mocha/bin/mocha -r babel-core/register test/**",
@@ -44,7 +43,6 @@
     "rollup-plugin-babel": "^2.6.1",
     "rollup-plugin-commonjs": "^4.1.0",
     "rollup-plugin-node-resolve": "^2.0.0",
-    "semantic-release": "^4.3.5",
     "standard": "^8.0.0",
     "webpack": "^1.13.2",
     "webpack-dev-server": "^1.15.1"

@@ -22,14 +22,11 @@ let fixtures = {
     return {u2: {metas: [{id: 2, phx_ref: '2'}]}}
   },
   state () {
-    return {
+    return fromJS({
       u1: {metas: [{id: 1, phx_ref: '1'}]},
       u2: {metas: [{id: 2, phx_ref: '2'}]},
       u3: {metas: [{id: 3, phx_ref: '3'}]}
-    }
-  },
-  immutableState () {
-    return fromJS(this.state())
+    })
   }
 }
 
@@ -43,7 +40,7 @@ describe('syncState', () => {
   })
 
   it("onJoins new presences and onLeave's left presences", () => {
-    const newState = fixtures.immutableState()
+    const newState = fixtures.state()
     const state = fromJS({u4: {metas: [{id: 4, phx_ref: '4'}]}})
     let joined = {}
     let left = {}
@@ -98,7 +95,7 @@ describe('syncDiff', () => {
   })
 
   it('adds additional meta', () => {
-    let state = fixtures.immutableState()
+    let state = fixtures.state()
     assertImmutableEquals(
       fromJS({
         u1: {metas: [{id: 1, phx_ref: '1'}, {id: 1, phx_ref: '1.2'}]},
@@ -110,7 +107,7 @@ describe('syncDiff', () => {
   })
 
   it('removes presence when meta is empty and adds additional meta', () => {
-    let state = fixtures.immutableState()
+    let state = fixtures.state()
     const newState = Presence.syncDiff(state, {joins: fixtures.joins(), leaves: fixtures.leaves()})
 
     assertImmutableEquals(
@@ -136,7 +133,7 @@ describe('syncDiff', () => {
 
 describe('list', () => {
   it('lists full presence by default', () => {
-    const state = fixtures.immutableState()
+    const state = fixtures.state()
     const expected = fromJS([
       {metas: [{id: 1, phx_ref: '1'}]},
       {metas: [{id: 2, phx_ref: '2'}]},

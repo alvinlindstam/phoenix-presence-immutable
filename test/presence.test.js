@@ -64,7 +64,7 @@ describe('syncState', () => {
 
   it('onJoins only newly added metas', () => {
     const newState = fromJS({u3: {metas: [{id: 3, phx_ref: '3'}, {id: 3, phx_ref: '3.new'}]}})
-    const state = fromJS({u3: {metas: [{id: 3, phx_ref: '3'}]}})
+    const state = fromJS({u3: {metas: [{id: 3, phx_ref: '3'}, {id: 3, phx_ref: '3.old'}]}})
     const joined = {}
     const left = {}
     const onJoin = (key, current, newPres) => {
@@ -75,11 +75,18 @@ describe('syncState', () => {
     }
     const syncedState = Presence.syncState(state, newState, onJoin, onLeave)
     assertImmutableEquals(newState, syncedState)
-    assert.deepEqual(joined, {
-      u3: {current: {metas: [{id: 3, phx_ref: '3'}]},
-        newPres: {metas: [{id: 3, phx_ref: '3'}, {id: 3, phx_ref: '3.new'}]}}
-    })
-    assert.deepEqual(left, {})
+    assert.deepEqual({
+        u3: {
+          current: {metas: [{id: 3, phx_ref: '3'}, {id: 3, phx_ref: '3.old'}]},
+          newPres: {metas: [{id: 3, phx_ref: '3'}, {id: 3, phx_ref: '3.old'}, {id: 3, phx_ref: '3.new'}]}
+        }
+      }, joined)
+    assert.deepEqual({
+        u3: {
+          leftPres: {metas: [{id: 3, phx_ref: '3.old'}]},
+          current: {metas: [{id: 3, phx_ref: '3'}, {id: 3, phx_ref: '3.new'}]}
+        }
+      }, left)
   })
 })
 

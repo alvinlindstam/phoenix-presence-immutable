@@ -190,15 +190,18 @@ export var Presence = {
     const onlyInOld = inCollisions.map((newPresence, key) => extractMetas(newPresence, oldState.get(key)))
     const onlyInNew = inCollisions.map((newPresence, key) => extractMetas(oldState.get(key), newPresence))
 
-    const leaves = oldState.filterNot((_presence, key) => newState.has(key)).merge(onlyInOld)
-    const joins = newByDiff.get('new', emptyMap).merge(onlyInNew)
+    const allNewPresences = newByDiff.get('new', emptyMap)
+    const notFoundPresences = oldState.filterNot((_presence, key) => newState.has(key))
 
-    return this.syncDiff(oldState, {joins: joins.toJS(), leaves: leaves.toJS()}, onJoin, onLeave)
+    return this.syncDiff(oldState, {
+      joins: allNewPresences.merge(onlyInNew),
+      leaves: notFoundPresences.merge(onlyInOld)
+    }, onJoin, onLeave)
   },
 
   syncDiff (state, {joins, leaves}, onJoin, onLeave) {
-    const immutableJoins = Immutable.fromJS(joins)
-    const immutableLeaves = Immutable.fromJS(leaves)
+    const immutableJoins = Immutable.isCollection(joins) ? joins : Immutable.fromJS(joins)
+    const immutableLeaves = Immutable.isCollection(leaves) ? leaves : Immutable.fromJS(leaves)
 
     state = immutableJoins.reduce((state, newPresence, key) => {
       const currentPresence = state.get(key)

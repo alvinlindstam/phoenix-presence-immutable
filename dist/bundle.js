@@ -195,27 +195,32 @@ var Presence = {
     var newByDiff = newState.groupBy(function (value, key) {
       return oldState.has(key) ? 'collision' : 'new';
     });
+    var inCollisions = newByDiff.get('collision', emptyMap);
 
-    var leavesInCollisions = newByDiff.get('collision', emptyMap).map(function (newPresence, key) {
+    // for all keys found in both oldState and newState, find the metas that are only in one of them
+    var onlyInOld = inCollisions.map(function (newPresence, key) {
       return extractMetas(newPresence, oldState.get(key));
     });
-    var leaves = oldState.filterNot(function (_presence, key) {
-      return newState.has(key);
-    }).merge(leavesInCollisions);
-
-    var joinsInCollisions = newByDiff.get('collision', emptyMap).map(function (newPresence, key) {
+    var onlyInNew = inCollisions.map(function (newPresence, key) {
       return extractMetas(oldState.get(key), newPresence);
     });
-    var joins = newByDiff.get('new', emptyMap).merge(joinsInCollisions);
 
-    return this.syncDiff(oldState, { joins: joins.toJS(), leaves: leaves.toJS() }, onJoin, onLeave);
+    var allNewPresences = newByDiff.get('new', emptyMap);
+    var notFoundPresences = oldState.filterNot(function (_presence, key) {
+      return newState.has(key);
+    });
+
+    return this.syncDiff(oldState, {
+      joins: allNewPresences.merge(onlyInNew),
+      leaves: notFoundPresences.merge(onlyInOld)
+    }, onJoin, onLeave);
   },
   syncDiff: function syncDiff(state, _ref, onJoin, onLeave) {
     var joins = _ref.joins,
         leaves = _ref.leaves;
 
-    var immutableJoins = Immutable.fromJS(joins);
-    var immutableLeaves = Immutable.fromJS(leaves);
+    var immutableJoins = Immutable.isCollection(joins) ? joins : Immutable.fromJS(joins);
+    var immutableLeaves = Immutable.isCollection(leaves) ? leaves : Immutable.fromJS(leaves);
 
     state = immutableJoins.reduce(function (state, newPresence, key) {
       var currentPresence = state.get(key);

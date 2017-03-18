@@ -169,37 +169,41 @@
 
 import Immutable from 'immutable'
 
+const reduce = function (state, obj, func) {
+  const keys = Object.getOwnPropertyNames(obj)
+  return keys.reduce((state, key) => func(state, key, obj[key]), state)
+}
+
 export var Presence = {
 
   syncState (currentState, newState, onJoin, onLeave) {
-    let state = this.clone(currentState)
+    let state = currentState
+    newState = Immutable.fromJS(newState)
     let joins = {}
-    let leaves = {}
 
-    this.map(state, (key, presence) => {
-      if (!newState[key]) {
-        leaves[key] = presence
-      }
-    })
-    this.map(newState, (key, newPresence) => {
-      let currentPresence = state[key]
+    let leaves = state.filterNot((_presence, key) => newState.has(key)).toJS()
+    newState.map((newPresence, key) => {
+      let currentPresence = state.get(key)
       if (currentPresence) {
-        let newRefs = newPresence.metas.map(m => m.phx_ref)
-        let curRefs = currentPresence.metas.map(m => m.phx_ref)
-        let joinedMetas = newPresence.metas.filter(m => curRefs.indexOf(m.phx_ref) < 0)
-        let leftMetas = currentPresence.metas.filter(m => newRefs.indexOf(m.phx_ref) < 0)
-        if (joinedMetas.length > 0) {
-          joins[key] = newPresence
-          joins[key].metas = joinedMetas
+        let newRefs = newPresence.get('metas').map(m => m.get('phx_ref'))
+        let curRefs = currentPresence.get('metas').map(m => m.get('phx_ref'))
+        let joinedMetas = newPresence.get('metas').filter(m => curRefs.indexOf(m.get('phx_ref')) < 0)
+        let leftMetas = currentPresence.get('metas').filter(m => newRefs.indexOf(m.get('phx_ref')) < 0)
+
+        if (joinedMetas.size > 0) {
+          joins[key] = newPresence.toJS()
+          joins[key].metas = joinedMetas.toJS()
         }
-        if (leftMetas.length > 0) {
-          leaves[key] = this.clone(currentPresence)
-          leaves[key].metas = leftMetas
+
+        if (leftMetas.size > 0) {
+          leaves[key] = currentPresence.toJS()
+          leaves[key].metas = leftMetas.toJS()
         }
       } else {
-        joins[key] = newPresence
+        joins[key] = newPresence.toJS()
       }
     })
+
     return this.syncDiff(state, {joins: joins, leaves: leaves}, onJoin, onLeave)
   },
 
@@ -208,7 +212,7 @@ export var Presence = {
     if (!onJoin) { onJoin = function () {} }
     if (!onLeave) { onLeave = function () {} }
 
-    state = this.reduce(state, joins, (state, key, newPresence) => {
+    state = reduce(state, joins, (state, key, newPresence) => {
       const currentPresence = state.get(key)
       newPresence = Immutable.fromJS(newPresence)
 
@@ -221,7 +225,7 @@ export var Presence = {
       onJoin(key, currentPresence, newPresence)
       return state
     })
-    state = this.reduce(state, leaves, (state, key, leftPresence) => {
+    state = reduce(state, leaves, (state, key, leftPresence) => {
       const currentPresence = state.get(key)
       if (!currentPresence) { return state }
       const refsToRemove = leftPresence.metas.map(m => m.phx_ref)
@@ -230,13 +234,14 @@ export var Presence = {
       const currentMetas = currentPresence.get('metas').filter(p => {
         return refsToRemove.indexOf(p.get('phx_ref')) < 0
       })
+      const currentNewPresence = currentPresence.set('metas', currentMetas)
       if (currentMetas.size === 0) {
         state = state.delete(key)
       } else {
-        state = state.set(key, currentPresence.set('metas', currentMetas))
+        state = state.set(key, currentNewPresence)
       }
       // todo: should callbacks be allowed to mutate the state?
-      onLeave(key, currentPresence, leftPresence)
+      onLeave(key, currentNewPresence, leftPresence)
       return state
     })
     return state
@@ -254,11 +259,6 @@ export var Presence = {
 
   map (obj, func) {
     return Object.getOwnPropertyNames(obj).map(key => func(key, obj[key]))
-  },
-
-  reduce (state, obj, func) {
-    const keys = Object.getOwnPropertyNames(obj)
-    return keys.reduce((state, key) => func(state, key, obj[key]), state)
   },
 
   clone (obj) { return JSON.parse(JSON.stringify(obj)) }

@@ -26,33 +26,26 @@ let fixtures = {
 
 describe('syncState', () => {
   it('syncs empty state', () => {
-    let newState = {u1: {metas: [{id: 1, phx_ref: '1'}]}}
-    let state = {}
-    let stateBefore = clone(state)
-    Presence.syncState(state, newState)
-    assert.deepEqual(state, stateBefore)
-
-    state = Presence.syncState(state, newState)
-    assert.deepEqual(state, newState)
+    const newStateData = {u1: {metas: [{id: 1, phx_ref: '1'}]}}
+    const state = new Map()
+    const newState = Presence.syncState(state, newStateData)
+    assert.deepEqual(state, new Map())
+    assert.deepEqual(newState.toJS(), newStateData)
   })
 
   it("onJoins new presences and onLeave's left presences", () => {
-    let newState = fixtures.state()
-    let state = {u4: {metas: [{id: 4, phx_ref: '4'}]}}
+    const newState = fixtures.immutableState()
+    const state = fromJS({u4: {metas: [{id: 4, phx_ref: '4'}]}})
     let joined = {}
     let left = {}
-    let onJoin = (key, current, newPres) => {
-      joined[key] = {current: current, newPres: newPres}
+    const onJoin = (key, current, newPres) => {
+      joined[key] = {current: current && current.toJS(), newPres: newPres.toJS()}
     }
-    let onLeave = (key, current, leftPres) => {
-      left[key] = {current: current, leftPres: leftPres}
+    const onLeave = (key, current, leftPres) => {
+      left[key] = {current: current && current.toJS(), leftPres: leftPres.toJS()}
     }
-    let stateBefore = clone(state)
-    Presence.syncState(state, newState, onJoin, onLeave)
-    assert.deepEqual(state, stateBefore)
-
-    state = Presence.syncState(state, newState, onJoin, onLeave)
-    assert.deepEqual(state, newState)
+    const syncedState = Presence.syncState(state, newState, onJoin, onLeave)
+    assert(syncedState.equals(newState))
     assert.deepEqual(joined, {
       u1: {current: null, newPres: {metas: [{id: 1, phx_ref: '1'}]}},
       u2: {current: null, newPres: {metas: [{id: 2, phx_ref: '2'}]}},
@@ -64,18 +57,20 @@ describe('syncState', () => {
   })
 
   it('onJoins only newly added metas', () => {
-    let newState = {u3: {metas: [{id: 3, phx_ref: '3'}, {id: 3, phx_ref: '3.new'}]}}
-    let state = {u3: {metas: [{id: 3, phx_ref: '3'}]}}
-    let joined = {}
-    let left = {}
-    let onJoin = (key, current, newPres) => {
-      joined[key] = {current: current, newPres: newPres}
+    const newState = fromJS({u3: {metas: [{id: 3, phx_ref: '3'}, {id: 3, phx_ref: '3.new'}]}})
+    const state = fromJS({u3: {metas: [{id: 3, phx_ref: '3'}]}})
+    const joined = {}
+    const left = {}
+    const onJoin = (key, current, newPres) => {
+      joined[key] = {current: current && current.toJS(), newPres: newPres.toJS()}
     }
-    let onLeave = (key, current, leftPres) => {
-      left[key] = {current: current, leftPres: leftPres}
+    const onLeave = (key, current, leftPres) => {
+      left[key] = {current: current && current.toJS(), leftPres: leftPres.toJS()}
     }
-    state = Presence.syncState(state, newState, onJoin, onLeave)
-    assert.deepEqual(state, newState)
+    const syncedState = Presence.syncState(state, newState, onJoin, onLeave)
+    if (!syncedState.equals(newState)) {
+      assert.deepEqual(syncedState.toJS(), newState.toJS())
+    }
     assert.deepEqual(joined, {
       u3: {current: {metas: [{id: 3, phx_ref: '3'}]},
         newPres: {metas: [{id: 3, phx_ref: '3'}, {id: 3, phx_ref: '3.new'}]}}
@@ -124,7 +119,6 @@ describe('syncDiff', () => {
     const state = fromJS({
       u1: {metas: [{id: 1, phx_ref: '1'}, {id: 1, phx_ref: '1.2'}]}
     })
-    console.warn("wip")
     const newState = Presence.syncDiff(state, {joins: {}, leaves: {u1: {metas: [{id: 1, phx_ref: '1'}]}}})
 
     assert.deepEqual({

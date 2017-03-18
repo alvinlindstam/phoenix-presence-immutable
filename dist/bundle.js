@@ -175,6 +175,13 @@ var Immutable = _interopDefault(require('immutable'));
 //     })
 //
 
+var reduce = function reduce(state, obj, func) {
+  var keys = Object.getOwnPropertyNames(obj);
+  return keys.reduce(function (state, key) {
+    return func(state, key, obj[key]);
+  }, state);
+};
+
 var Presence = {
   syncState: function syncState(currentState, newState, onJoin, onLeave) {
     var _this = this;
@@ -229,7 +236,7 @@ var Presence = {
       onLeave = function onLeave() {};
     }
 
-    state = this.reduce(state, joins, function (state, key, newPresence) {
+    state = reduce(state, joins, function (state, key, newPresence) {
       var currentPresence = state.get(key);
       newPresence = Immutable.fromJS(newPresence);
 
@@ -242,7 +249,7 @@ var Presence = {
       onJoin(key, currentPresence, newPresence);
       return state;
     });
-    state = this.reduce(state, leaves, function (state, key, leftPresence) {
+    state = reduce(state, leaves, function (state, key, leftPresence) {
       var currentPresence = state.get(key);
       if (!currentPresence) {
         return state;
@@ -285,12 +292,6 @@ var Presence = {
     return Object.getOwnPropertyNames(obj).map(function (key) {
       return func(key, obj[key]);
     });
-  },
-  reduce: function reduce(state, obj, func) {
-    var keys = Object.getOwnPropertyNames(obj);
-    return keys.reduce(function (state, key) {
-      return func(state, key, obj[key]);
-    }, state);
   },
   clone: function clone(obj) {
     return JSON.parse(JSON.stringify(obj));

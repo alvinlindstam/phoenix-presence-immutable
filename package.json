@@ -53,8 +53,5 @@
       "it"
     ]
   },
-  "homepage": "https://github.com/alvinlindstam/phoenix-presence-immutable#readme",
-  "browser": {
-    "immutable": false
-  }
+  "homepage": "https://github.com/alvinlindstam/phoenix-presence-immutable#readme"
 }

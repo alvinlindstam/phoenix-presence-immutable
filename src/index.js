@@ -178,9 +178,7 @@ const extractMetas = (comparedPresence, newPresence) => {
   return emptyMap.set('metas', newMetas)
 }
 
-export var Presence = {
-
-  syncState (oldState, newState, onJoin, onLeave) {
+export const syncState = function(oldState, newState, onJoin, onLeave) {
     newState = Immutable.fromJS(newState)
 
     const newByDiff = newState.groupBy((value, key) => oldState.has(key) ? 'collision' : 'new')
@@ -193,13 +191,13 @@ export var Presence = {
     const allNewPresences = newByDiff.get('new', emptyMap)
     const notFoundPresences = oldState.filterNot((_presence, key) => newState.has(key))
 
-    return this.syncDiff(oldState, {
+    return syncDiff(oldState, {
       joins: allNewPresences.merge(onlyInNew),
       leaves: notFoundPresences.merge(onlyInOld)
     }, onJoin, onLeave)
-  },
+  }
 
-  syncDiff (state, {joins, leaves}, onJoin, onLeave) {
+export const syncDiff = function (state, {joins, leaves}, onJoin, onLeave) {
     const immutableJoins = Immutable.isCollection(joins) ? joins : Immutable.fromJS(joins)
     const immutableLeaves = Immutable.isCollection(leaves) ? leaves : Immutable.fromJS(leaves)
 
@@ -223,11 +221,18 @@ export var Presence = {
       if (onLeave) { onLeave(key, currentNewPresence, leftPresence) }
       return currentMetas.size ? state.set(key, currentNewPresence) : state.delete(key)
     }, state)
-  },
-
-  list (state, chooser = (key, presence) => presence) {
-    return state.map((value, key) => {
-      return chooser(key, value)
-    }).valueSeq()
   }
+
+export const list = function (state, chooser = (key, presence) => presence) {
+  return state.map((value, key) => {
+    return chooser(key, value)
+  }).valueSeq()
 }
+
+const ImmutablePresence = {
+  syncState: syncState,
+  syncDiff: syncDiff,
+  list: list
+}
+
+export default ImmutablePresence

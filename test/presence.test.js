@@ -1,6 +1,6 @@
 import assert from 'assert'
 
-import {Presence} from '../src/index.js'
+import Presence, {syncDiff, syncState, list} from '../src/index.js'
 import {Map, fromJS} from 'immutable'
 
 let clone = (obj) => { return JSON.parse(JSON.stringify(obj)) }
@@ -29,6 +29,14 @@ let fixtures = {
     })
   }
 }
+
+describe('exports', () => {
+  it('all functions are available on default export and as individual functions', () => {
+    assert(Object.is(Presence.list, list))
+    assert(Object.is(Presence.syncState, syncState))
+    assert(Object.is(Presence.syncDiff, syncDiff))
+  })
+})
 
 describe('syncState', () => {
   it('syncs empty state', () => {

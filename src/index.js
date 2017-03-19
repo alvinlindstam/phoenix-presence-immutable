@@ -53,6 +53,7 @@ export const syncDiff = function (originalState, {joins, leaves}, onChanged) {
     const currentNewPresence = currentPresence.set('metas', currentMetas)
     return currentMetas.size ? state.set(key, currentNewPresence) : state.delete(key)
   }, stateAfterJoins)
+
   if (!onChanged) {
     return stateAfterLeaves
   }
@@ -60,7 +61,7 @@ export const syncDiff = function (originalState, {joins, leaves}, onChanged) {
   return changedKeys.reduce((state, key) => {
     const currentPresence = state.get(key)
     const newPresence = onChanged(key, currentPresence, originalState.get(key))
-    if (newPresence && Immutable.is(newPresence.get('metas'), currentPresence.get('metas'))) {
+    if (newPresence && currentPresence && Immutable.is(newPresence.get('metas'), currentPresence.get('metas'))) {
       return state.set(key, newPresence)
     }
     return state

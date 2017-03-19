@@ -47,7 +47,7 @@ describe('syncState', () => {
     assertImmutableEquals(fromJS(newStateData), newState)
   })
 
-  it("calls onChanged as expected", () => {
+  it('calls onChanged as expected', () => {
     const newState = fixtures.state
     const state = fromJS({u1: {metas: [{id: 1, phx_ref: 'other'}]}, u4: {metas: [{id: 4, phx_ref: '4'}]}})
     const changed = {}
@@ -55,7 +55,7 @@ describe('syncState', () => {
       assert(changed[key] == undefined)
       changed[key] = {
         new: newPresence && newPresence.toJS(),
-        old: oldPresence && oldPresence.toJS(),
+        old: oldPresence && oldPresence.toJS()
       }
     }
 
@@ -69,12 +69,12 @@ describe('syncState', () => {
     })
   })
 
-  it("allows onChanged to mutate presence data", () => {
+  it('allows onChanged to mutate presence data', () => {
     const newState = fixtures.state
     const state = new Map()
     const data = {}
     const onChanged = (key, newPresence, oldPresence) => {
-      if(newPresence) {
+      if (newPresence) {
         data[key] = newPresence.set('extraData', key).set('count', newPresence.get('metas').size)
         return data[key]
       }
@@ -88,7 +88,7 @@ describe('syncState', () => {
     const newState = fixtures.state
     const state = new Map()
     const onChanged = (key, newPresence, oldPresence) => {
-      if(newPresence) {
+      if (newPresence) {
         return newPresence.set('metas', 2)
       }
     }

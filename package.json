@@ -1,6 +1,6 @@
 {
   "name": "phoenix-presence-immutable",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": " --ADD A DESCRIPTION-- ",
   "main": "dist/bundle.js",
   "scripts": {

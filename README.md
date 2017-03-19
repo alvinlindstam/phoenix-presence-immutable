@@ -37,23 +37,23 @@ myChannel.on("presence_diff", diff => {
 Returns an empty state object. Use this as your first state and before letting
 `syncState` and `syncDiff` use it for their updates.
 
-### `syncState(oldState, newState, onJoin, onLeave)`
+### `syncState(oldState, newState, onChanged)`
 `ImmutablePresence.syncState` is used to sync the list of presences on the server
 with the client's state. `oldState` is the the current presence state, and `newState`
 should be the new state provided by the server (in normal JS format, not as Immutable.js 
 data structures)
 
-`onJoin` and `onLeave` are optional callbacks.
+[`onChanged`](#onChanged) is an optional callback
 
-### `syncDiff(oldState, diff, onJoin, onLeave)`
+### `syncDiff(oldState, diff, onChanged)`
 `ImmutablePresence.syncDiff` is used to sync a diff of presence join and leave
 events from the server, as they happen. `oldState` is the current presence state, and
 `diff` is the diff data provided by the server.
 
-`onJoin` and `onLeave` are optional callbacks.
+[`onChanged`](#onChanged) is an optional callback
 
 ### `list(presenceState, listBy)`
-`Presence.list` is used to return a sequence of presence information
+`ImmutablePresence.list` is used to return a sequence of presence information
 based on the local state of metadata. By default, all presence
 metadata is returned, but a `listBy` function can be supplied to
 allow the client to select which metadata to use for a given presence.
@@ -72,48 +72,48 @@ they came online from:
     }
     // onlineUsers will be an Immutable.Seq
     let onlineUsers = ImmutablePresence.list(presenceState, listBy)
-    
 
-### <a name="onJoin"></a>`onJoin()` and `onLeave()` callbacks
-The optional `onJoin` and `onLeave` callbacks can
-be provided to react to changes in the client's local presences across
-disconnects and reconnects with the server.
+Note that this will always return new Immutable objects, so any algorithms
+using object identity to identify changes will see each users data as new.
+A better option might be to aggregate user data on changes using the
+[`onChanged`](#onChanged) callback, which will only recalculate the data 
+on presence changes.
 
-`onJoin` is called with the arguments `key`, `oldPresence`, `newPresence`.
-`oldPresence` may be undefined if the user was not already present.
+### <a name="onChanged"></a>`onChanged(key, newPresence, oldPresence)` callback
+The `onChanged` callback can be used to react to changes in the client's local
+presences across disconnects and reconnects with the server.
 
-`onJoin` is called with the arguments `key`, `newPresence`, `oldPresence`.
-`newPresence.get('metas')` will contain all presence metas that are not yet
-disconnected, and will be empty if the presence was removed altogether.
+`newPresence` and `oldPresence` is the old and new presence state for the given
+key. One of them may be undefined. The callback is called once for each changed
+presence object.
 
-These functions are called once for each new or removed meta object, so a single
-call to `syncState` or `syncDiff` may result in multiple calls to the callbacks
-with the same key. Assuming the current state is empty, and `syncState` is called
-with `{alvin: {metas: [{device: "desktop", phx_ref: '1'}, {device: "mobile", phx_ref: '2'}]}}`,
-`onJoin` would be called twice:
- 
-```javascript
-onJoin('alvin', undefined, fromJS({metas: [{device: "desktop", phx_ref: '1'}]}));
-onJoin('alvin', fromJS({metas: [{device: "desktop", phx_ref: '1'}]}), fromJS({metas: [{device: "desktop", phx_ref: '1'}, {device: "mobile", phx_ref: '2'}]}));
+The function may return a modified version of newPresence, if it wishes to set
+additional data for the given key. The presence metas may not be changed.
+
+#### Example onChanged usage: aggregated data
+```
+const onChange = (key, newPresence) => {
+  return newPresence.set(
+    'isTyping', newPresence.get('metas').some((meta) => meta.get('isTyping'))
+  ).set(
+    'connectionCount', newPresence.get('metas').size
+  ).set(
+    'userId', key
+  )
+}   
 ```
 
-#### Example callback usage
+#### Example onChanged usage: notifications
 ```
 // detect if user has joined for the 1st time or from another tab/device
-let onJoin = (id, oldPresence, newPresence) => {
+const onChange = (id, newPresence, oldPresence) => {
   if(!oldPresence){
     console.log("user has entered for the first time", newPresence)
-  } else {
-    console.log("user additional presence", newPresence)
   }
-}
-// detect if user has left from all tabs/devices, or is still present
-let onLeave = (id, newPresence, oldPresence) => {
-  if(newPresence.get('metas').size === 0){
+  
+  if(!newPresence){
     console.log("user has left from all devices", oldPresence)
-  } else {
-    console.log("user left from a device", oldPresence)
-  }
+  } 
 }   
 ```
 
@@ -129,8 +129,12 @@ Phoenix.Presence.track on the server. The values are the presence objects.
 To get the total number of presences, use `presenceState.size`. 
 
 ### Presence objects
-For each key, there is a single presence object. It is an Immutable.Map, and it
-has a single key: "metas" which is an Immutable.Collection.
+For each key, there is a single presence object. It is an Immutable.Map.
+
+It always has the key "metas" which is an Immutable.Collection.
+
+It may also contain any additional metadata aggregated through the
+[onChange](#onChange) callback.
 
 ### Metas
 For each present key, there will be at least one but possible many meta objects.

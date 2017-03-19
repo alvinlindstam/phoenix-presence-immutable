@@ -137,10 +137,13 @@ export const list = function (state, chooser = (key, presence) => presence) {
   }).valueSeq()
 }
 
+export const emptyState = () => emptyMap
+
 const ImmutablePresence = {
   syncState: syncState,
   syncDiff: syncDiff,
-  list: list
+  list: list,
+  emptyState: emptyState
 }
 
 export default ImmutablePresence

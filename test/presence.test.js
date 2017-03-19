@@ -92,6 +92,34 @@ describe('syncState', () => {
     })
   })
 
+  it("allows onChanged to mutate presence data", () => {
+    const newState = fixtures.state
+    const state = new Map()
+    const data = {}
+    const onChanged = (key, newPresence, oldPresence) => {
+      if(newPresence) {
+        data[key] = newPresence.set('extraData', key).set('count', newPresence.get('metas').size)
+        return data[key]
+      }
+    }
+
+    const syncedState = Presence.syncState(state, newState, onChanged)
+    assertImmutableEquals(new Map(data), syncedState)
+  })
+
+  it("disallows onChanged to mutate presence data if it changes it's metas", () => {
+    const newState = fixtures.state
+    const state = new Map()
+    const onChanged = (key, newPresence, oldPresence) => {
+      if(newPresence) {
+        return newPresence.set('metas', 2)
+      }
+    }
+
+    const syncedState = Presence.syncState(state, newState, onChanged)
+    assertImmutableEquals(newState, syncedState)
+  })
+
   it('onJoins only newly added metas', () => {
     const newState = fromJS({u3: {metas: [{id: 3, phx_ref: '3'}, {id: 3, phx_ref: '3.new'}]}})
     const state = fromJS({u3: {metas: [{id: 3, phx_ref: '3'}, {id: 3, phx_ref: '3.old'}]}})

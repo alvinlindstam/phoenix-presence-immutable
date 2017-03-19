@@ -60,7 +60,11 @@ export const syncDiff = function (originalState, {joins, leaves}, onChanged, onJ
   }
   const changedKeys = immutableJoins.keySeq().concat(immutableLeaves.keySeq()).toSet()
   return changedKeys.reduce((state, key) => {
-    onChanged(key, state.get(key), originalState.get(key))
+    const currentPresence = state.get(key)
+    const newPresence = onChanged(key, currentPresence, originalState.get(key))
+    if (newPresence && Immutable.is(newPresence.get('metas'), currentPresence.get('metas'))) {
+      return state.set(key, newPresence)
+    }
     return state
   }, stateAfterLeaves)
 }

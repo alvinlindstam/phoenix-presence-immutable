@@ -12,7 +12,7 @@ const extractMetas = (comparedPresence, newPresence) => {
   return emptyMap.set('metas', newMetas)
 }
 
-export const syncState = function (oldState, newState, onJoin, onLeave) {
+export const syncState = function (oldState, newState, onChanged, onJoin, onLeave) {
   newState = Immutable.fromJS(newState)
 
   const newByDiff = newState.groupBy((value, key) => oldState.has(key) ? 'collision' : 'new')
@@ -28,23 +28,23 @@ export const syncState = function (oldState, newState, onJoin, onLeave) {
   return syncDiff(oldState, {
     joins: allNewPresences.merge(onlyInNew),
     leaves: notFoundPresences.merge(onlyInOld)
-  }, onJoin, onLeave)
+  }, onChanged, onJoin, onLeave)
 }
 
-export const syncDiff = function (state, {joins, leaves}, onJoin, onLeave) {
+export const syncDiff = function (originalState, {joins, leaves}, onChanged, onJoin, onLeave) {
   const immutableJoins = isImmutable(joins) ? joins : Immutable.fromJS(joins)
   const immutableLeaves = isImmutable(leaves) ? leaves : Immutable.fromJS(leaves)
 
-  state = immutableJoins.reduce((state, newPresence, key) => {
+  const stateAfterJoins = immutableJoins.reduce((state, newPresence, key) => {
     const currentPresence = state.get(key)
     if (currentPresence) {
       newPresence = newPresence.set('metas', currentPresence.get('metas').concat(newPresence.get('metas')))
     }
     if (onJoin) { onJoin(key, currentPresence, newPresence) }
     return state.set(key, newPresence)
-  }, state)
+  }, originalState)
 
-  return immutableLeaves.reduce((state, leftPresence, key) => {
+  const stateAfterLeaves = immutableLeaves.reduce((state, leftPresence, key) => {
     const currentPresence = state.get(key)
     if (!currentPresence) { return state }
 
@@ -54,7 +54,15 @@ export const syncDiff = function (state, {joins, leaves}, onJoin, onLeave) {
     const currentNewPresence = currentPresence.set('metas', currentMetas)
     if (onLeave) { onLeave(key, currentNewPresence, leftPresence) }
     return currentMetas.size ? state.set(key, currentNewPresence) : state.delete(key)
-  }, state)
+  }, stateAfterJoins)
+  if (!onChanged) {
+    return stateAfterLeaves
+  }
+  const changedKeys = immutableJoins.keySeq().concat(immutableLeaves.keySeq()).toSet()
+  return changedKeys.reduce((state, key) => {
+    onChanged(key, state.get(key), originalState.get(key))
+    return state
+  }, stateAfterLeaves)
 }
 
 export const list = function (state, chooser = (key, presence) => presence) {

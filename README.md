@@ -92,7 +92,7 @@ additional data for the given key. The presence metas may not be changed.
 
 #### Example onChanged usage: aggregated data
 ```
-const onChange = (key, newPresence) => {
+const onChanged = (key, newPresence) => {
   return newPresence.set(
     'isTyping', newPresence.get('metas').some((meta) => meta.get('isTyping'))
   ).set(
@@ -106,7 +106,7 @@ const onChange = (key, newPresence) => {
 #### Example onChanged usage: notifications
 ```
 // detect if user has joined for the 1st time or from another tab/device
-const onChange = (id, newPresence, oldPresence) => {
+const onChanged = (id, newPresence, oldPresence) => {
   if(!oldPresence){
     console.log("user has entered for the first time", newPresence)
   }
@@ -134,7 +134,7 @@ For each key, there is a single presence object. It is an Immutable.Map.
 It always has the key "metas" which is an Immutable.Collection.
 
 It may also contain any additional metadata aggregated through the
-[onChange](#onChange) callback.
+[onChanged](#onChanged) callback.
 
 ### Metas
 For each present key, there will be at least one but possible many meta objects.

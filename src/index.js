@@ -12,7 +12,7 @@ const extractMetas = (comparedPresence, newPresence) => {
   return emptyMap.set('metas', newMetas)
 }
 
-export const syncState = function (oldState, newState, onChanged, onJoin, onLeave) {
+export const syncState = function (oldState, newState, onChanged) {
   newState = Immutable.fromJS(newState)
 
   const newByDiff = newState.groupBy((value, key) => oldState.has(key) ? 'collision' : 'new')
@@ -28,10 +28,10 @@ export const syncState = function (oldState, newState, onChanged, onJoin, onLeav
   return syncDiff(oldState, {
     joins: allNewPresences.merge(onlyInNew),
     leaves: notFoundPresences.merge(onlyInOld)
-  }, onChanged, onJoin, onLeave)
+  }, onChanged)
 }
 
-export const syncDiff = function (originalState, {joins, leaves}, onChanged, onJoin, onLeave) {
+export const syncDiff = function (originalState, {joins, leaves}, onChanged) {
   const immutableJoins = isImmutable(joins) ? joins : Immutable.fromJS(joins)
   const immutableLeaves = isImmutable(leaves) ? leaves : Immutable.fromJS(leaves)
 
@@ -40,7 +40,6 @@ export const syncDiff = function (originalState, {joins, leaves}, onChanged, onJ
     if (currentPresence) {
       newPresence = newPresence.set('metas', currentPresence.get('metas').concat(newPresence.get('metas')))
     }
-    if (onJoin) { onJoin(key, currentPresence, newPresence) }
     return state.set(key, newPresence)
   }, originalState)
 
@@ -52,7 +51,6 @@ export const syncDiff = function (originalState, {joins, leaves}, onChanged, onJ
 
     const currentMetas = currentPresence.get('metas').filterNot(p => refsToRemove.includes(p.get('phx_ref')))
     const currentNewPresence = currentPresence.set('metas', currentMetas)
-    if (onLeave) { onLeave(key, currentNewPresence, leftPresence) }
     return currentMetas.size ? state.set(key, currentNewPresence) : state.delete(key)
   }, stateAfterJoins)
   if (!onChanged) {

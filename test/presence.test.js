@@ -38,6 +38,27 @@ describe('exports', () => {
   })
 })
 
+describe('sync', () => {
+  it('syncs state', () => {
+    const newStateData = {u1: {metas: [{id: 1, phx_ref: '1'}]}}
+    const newState = Presence.sync(Presence.emptyState(), newStateData)
+    assertImmutableEquals(fromJS(newStateData), newState)
+  })
+  it('syncs joins', () => {
+    const newState = Presence.sync(Presence.emptyState(), {joins: fixtures.joins(), leaves: {}})
+    assertImmutableEquals(fromJS(fixtures.joins()), newState)
+  })
+
+  it('isnt fooled by joins and leaves as presence keys', () => {
+    const stateData = {
+      leaves: {metas: [{id: 1, phx_ref: '1.leaves'}]},
+      joins: {metas: [{id: 1, phx_ref: '1.joins'}]}
+    }
+    const newState = Presence.sync(Presence.emptyState(), stateData)
+    assertImmutableEquals(fromJS(stateData), newState)
+  })
+})
+
 describe('syncState', () => {
   it('syncs empty state', () => {
     const newStateData = {u1: {metas: [{id: 1, phx_ref: '1'}]}}

@@ -10,6 +10,17 @@ var emptyMap = new Immutable.Map();
 
 // Immutable 4 compatibility
 var isImmutable = Immutable.isImmutable || Immutable.Iterable.isIterable;
+var coerceImmutable = function coerceImmutable(data) {
+  return isImmutable(data) ? data : Immutable.fromJS(data);
+};
+
+var isPresenceFormat = function isPresenceFormat(data) {
+  return coerceImmutable(data).every(function (presence, key) {
+    return presence.has('metas') && presence.get('metas').every(function (meta) {
+      return meta.has('phx_ref');
+    });
+  });
+};
 
 // Takes two immutable presence objects and returns all metas in the second that are not in the first
 var extractMetas = function extractMetas(comparedPresence, newPresence) {
@@ -49,12 +60,19 @@ var syncState = function syncState(oldState, newState, onChanged) {
   }, onChanged);
 };
 
+var sync = function sync(originalState, newData, onChanged) {
+  if (newData.joins && newData.leaves && isPresenceFormat(newData.joins) && isPresenceFormat(newData.leaves)) {
+    return syncDiff(originalState, newData, onChanged);
+  }
+  return syncState(originalState, newData, onChanged);
+};
+
 var syncDiff = function syncDiff(originalState, _ref, onChanged) {
   var joins = _ref.joins,
       leaves = _ref.leaves;
 
-  var immutableJoins = isImmutable(joins) ? joins : Immutable.fromJS(joins);
-  var immutableLeaves = isImmutable(leaves) ? leaves : Immutable.fromJS(leaves);
+  var immutableJoins = coerceImmutable(joins);
+  var immutableLeaves = coerceImmutable(leaves);
 
   var stateAfterJoins = immutableJoins.reduce(function (state, newPresence, key) {
     var currentPresence = state.get(key);
@@ -112,11 +130,13 @@ var emptyState = function emptyState() {
 var ImmutablePresence = {
   syncState: syncState,
   syncDiff: syncDiff,
+  sync: sync,
   list: list,
   emptyState: emptyState
 };
 
 exports.syncState = syncState;
+exports.sync = sync;
 exports.syncDiff = syncDiff;
 exports.list = list;
 exports.emptyState = emptyState;

@@ -16,19 +16,18 @@ import ImmutablePresence from 'phoenix-presence-immutable'
 // Assuming we're using a React component
 this.setState({presenceState: ImmutablePresence.emptyState()})
 
-// receive initial presence data from server, sent after join
-myChannel.on("presence_state", newState => {
+const updatePresence = newData => {
   this.setState((oldState) => {
-    return {presenceState: ImmutablePresence.syncState(oldState.presenceState, newState)}
+    const newPresenceState = ImmutablePresence.sync(oldState.presenceState, newData)
+    return {presenceState: newPresenceState}
   })
-})
+}
+
+// receive initial presence data from server, sent after join
+myChannel.on("presence_state", updatePresence)
 
 // receive "presence_diff" from server, containing join/leave events
-myChannel.on("presence_diff", diff => {
-  this.setState((oldState) => {
-    return {presenceState: ImmutablePresence.syncDiff(oldState.presenceState, diff)}
-  })
-})
+myChannel.on("presence_diff", updatePresence)
 ```
 
 ## Documentation
@@ -49,6 +48,10 @@ data structures)
 `ImmutablePresence.syncDiff` is used to sync a diff of presence join and leave
 events from the server, as they happen. `oldState` is the current presence state, and
 `diff` is the diff data provided by the server.
+
+### `sync(oldState, newData, onChanged)`
+`ImmutablePresence.sync` can be called with either a new state or presence diff data.
+It will inspect `newData` and detect if it should call `syncState` or `syncDiff`.
 
 [`onChanged`](#onChanged) is an optional callback
 
@@ -126,7 +129,7 @@ and Immutable.js.
 The top level data structure is an Immutable.Map, where the keys are the key used for
 Phoenix.Presence.track on the server. The values are the presence objects.
 
-To get the total number of presences, use `presenceState.size`. 
+To get the total number of presences, use `presenceState.size`.
 
 ### Presence objects
 For each key, there is a single presence object. It is an Immutable.Map.

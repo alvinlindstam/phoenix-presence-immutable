@@ -4,6 +4,11 @@ const emptyMap = new Immutable.Map()
 
 // Immutable 4 compatibility
 const isImmutable = Immutable.isImmutable || Immutable.Iterable.isIterable
+const coerceImmutable = data => isImmutable(data) ? data : Immutable.fromJS(data)
+
+const isPresenceFormat = data => coerceImmutable(data).every(
+  (presence, key) => (presence.has('metas') && presence.get('metas').every(meta => meta.has('phx_ref')))
+)
 
 // Takes two immutable presence objects and returns all metas in the second that are not in the first
 const extractMetas = (comparedPresence, newPresence) => {
@@ -31,9 +36,16 @@ export const syncState = function (oldState, newState, onChanged) {
   }, onChanged)
 }
 
+export const sync = function(originalState, newData, onChanged) {
+  if (newData.joins && newData.leaves && isPresenceFormat(newData.joins) && isPresenceFormat(newData.leaves)) {
+    return syncDiff(originalState, newData, onChanged)
+  }
+  return syncState(originalState, newData, onChanged)
+}
+
 export const syncDiff = function (originalState, {joins, leaves}, onChanged) {
-  const immutableJoins = isImmutable(joins) ? joins : Immutable.fromJS(joins)
-  const immutableLeaves = isImmutable(leaves) ? leaves : Immutable.fromJS(leaves)
+  const immutableJoins = coerceImmutable(joins)
+  const immutableLeaves = coerceImmutable(leaves)
 
   const stateAfterJoins = immutableJoins.reduce((state, newPresence, key) => {
     const currentPresence = state.get(key)
@@ -79,6 +91,7 @@ export const emptyState = () => emptyMap
 const ImmutablePresence = {
   syncState: syncState,
   syncDiff: syncDiff,
+  sync: sync,
   list: list,
   emptyState: emptyState
 }

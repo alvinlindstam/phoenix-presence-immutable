@@ -36,7 +36,7 @@ export const syncState = function (oldState, newState, onChanged) {
   }, onChanged)
 }
 
-export const sync = function(originalState, newData, onChanged) {
+export const sync = function (originalState, newData, onChanged) {
   if (newData.joins && newData.leaves && isPresenceFormat(newData.joins) && isPresenceFormat(newData.leaves)) {
     return syncDiff(originalState, newData, onChanged)
   }

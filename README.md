@@ -120,6 +120,20 @@ const onChanged = (id, newPresence, oldPresence) => {
 }   
 ```
 
+## Sorting
+
+The iteration order of an Immutable.Map is undefined, so iterating over the 
+state will be different from when using the built in Phoenix js client.
+
+To iterate over the presence state in a well defined order, use
+[presenceState.sortBy](https://facebook.github.io/immutable-js/docs/#/Map/sortBy)
+which will return an Immutable.OrderedMap.
+
+It is perfectly ok to save the ordered map and pass it as the existing state 
+into `sync`, `syncState` or `syncDiff`. You should re-sort the state afterwards
+if you wish to preserve you sort order (Immutable uses insertion order for OrderedMap,
+so any new keys will be added to the end). 
+
 ## Data structure
 
 The state maintained is a simple mapping from Phoenix's standard presence format
